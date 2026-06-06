@@ -9,13 +9,15 @@ const WebSocket = require('ws');
 const { initializeDatabase } = require('./config/database');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
+const { startCronJobs } = require('./services/brokerSync');
 const logger = require('./config/logger');
 
 // Routes (will create these)
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const apiKeyRoutes = require('./routes/apiKeys');
-const brokerRoutes = require('./routes/brokers');
+const authRoutes    = require('./routes/auth');
+const userRoutes    = require('./routes/users');
+const apiKeyRoutes  = require('./routes/apiKeys');
+const brokerRoutes  = require('./routes/brokers');
+const webhookRoutes = require('./routes/webhooks');
 const tradingRoutes = require('./routes/trading');
 const analysisRoutes = require('./routes/analysis');
 const billingRoutes = require('./routes/billing');
@@ -60,6 +62,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────
+// Webhooks use raw body parsing (must come before express.json routes)
+app.use('/api/webhooks', webhookRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
@@ -130,6 +135,7 @@ async function start() {
     await initializeDatabase();
     logger.info('✅ Database initialized');
     
+    startCronJobs();
     server.listen(PORT, () => {
       logger.info(`
 ╔════════════════════════════════════════════════╗

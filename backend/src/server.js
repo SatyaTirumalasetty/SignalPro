@@ -18,9 +18,11 @@ const userRoutes    = require('./routes/users');
 const apiKeyRoutes  = require('./routes/apiKeys');
 const brokerRoutes  = require('./routes/brokers');
 const webhookRoutes = require('./routes/webhooks');
+const marketRoutes = require('./routes/market');
 const tradingRoutes = require('./routes/trading');
 const analysisRoutes = require('./routes/analysis');
 const billingRoutes = require('./routes/billing');
+const subscriptionRoutes = require('./routes/subscriptions');
 const adminRoutes = require('./routes/admin');
 
 const app = express();
@@ -69,9 +71,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/brokers', brokerRoutes);
+app.use('/api/market', marketRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────

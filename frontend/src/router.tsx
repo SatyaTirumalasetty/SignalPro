@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AdminRoute } from '@/components/AdminRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { AdminLayout } from '@/components/layout/AdminLayout'
 
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
@@ -19,6 +21,11 @@ import { BrokersPage } from '@/pages/brokers/BrokersPage'
 import { BrokerConnectedPage } from '@/pages/brokers/BrokerConnectedPage'
 import { BillingPage } from '@/pages/billing/BillingPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { AdminOverviewPage } from '@/pages/admin/AdminOverviewPage'
+import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
+import { AdminBillingPage } from '@/pages/admin/AdminBillingPage'
+import { AdminSignalsPage } from '@/pages/admin/AdminSignalsPage'
+import { AdminSupportPage } from '@/pages/admin/AdminSupportPage'
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -30,6 +37,21 @@ const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: '/brokers/connected', element: <BrokerConnectedPage /> },
+      {
+        element: <AdminRoute />,
+        children: [
+          {
+            element: <AdminLayout />,
+            children: [
+              { path: '/admin', element: <AdminOverviewPage /> },
+              { path: '/admin/users', element: <AdminUsersPage /> },
+              { path: '/admin/billing', element: <AdminBillingPage /> },
+              { path: '/admin/signals', element: <AdminSignalsPage /> },
+              { path: '/admin/support', element: <AdminSupportPage /> },
+            ],
+          },
+        ],
+      },
       {
         element: <AppLayout />,
         children: [

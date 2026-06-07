@@ -274,3 +274,109 @@ export interface ApiError {
   error: string
   errors?: Array<{ field: string; message: string }>
 }
+
+export interface AdminUserSummary {
+  id: string
+  email: string
+  full_name: string
+  status: string
+  kyc_status: string
+  email_verified: boolean
+  created_at: string
+  totp_enabled: boolean
+  subscription_status: string | null
+  plan_tier: string | null
+  broker_count: string | number
+}
+
+export interface AdminUserDetail {
+  id: string
+  email: string
+  full_name: string
+  status: string
+  kyc_status: string
+  email_verified: boolean
+  created_at: string
+  updated_at: string
+  totp_enabled: boolean
+  subscription_status: string | null
+  plan_name: string | null
+  plan_tier: string | null
+}
+
+export interface AdminActivityEntry {
+  action: string
+  entity_type: string
+  status: string
+  created_at: string
+}
+
+export interface AdminMrrPoint {
+  month: string
+  mrr: string
+  new_subs: string
+}
+
+export interface AdminRevenueByPlan {
+  name: string
+  tier: string
+  subscriber_count: string
+  mrr: string
+}
+
+export interface AdminSignalStat {
+  symbol: string
+  signal_type: string
+  total: number
+  avg_confidence: string
+  executed: number
+}
+
+export interface AdminSignalOverall {
+  total: string
+  avg_confidence: string
+  total_tokens: string
+  unique_users: string
+}
+
+export interface SupportTicket {
+  id: string
+  user_id: string
+  title: string
+  description: string
+  category: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
+  user_email: string
+  user_name: string
+  created_at: string
+  assigned_to: string | null
+  resolved_at: string | null
+  resolution_notes: string | null
+}
+
+export interface SystemAlert {
+  id: string
+  alert_type: string
+  severity: 'info' | 'warning' | 'critical'
+  message: string
+  status: string
+  created_at: string
+}
+
+export interface SystemHealth {
+  status: string
+  timestamp: string
+  metrics: {
+    active_users: number
+    active_subscriptions: number
+    open_support_tickets: number
+    connected_brokers: number
+  }
+  recent_errors: Array<{
+    action: string
+    entity_type: string
+    error_message: string
+    created_at: string
+  }>
+}

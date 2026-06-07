@@ -29,11 +29,13 @@ The app runs at `http://localhost:5173` and expects the backend (see `../backend
 - `src/lib/` — API client (with auth-refresh interceptor), query client, formatting helpers
 - `src/contexts/` + `src/hooks/` — auth and toast contexts/hooks
 - `src/components/` — shared UI primitives (`ui/`), layout shells, the live-price chart
-- `src/pages/` — route-level pages, grouped by feature area (`auth/`, `trading/`, `market/`, `signals/`)
+- `src/pages/` — route-level pages, grouped by feature area (`auth/`, `trading/`, `market/`, `signals/`, `brokers/`, `billing/`, `settings/`)
 - `src/router.tsx` — route table and the `ProtectedRoute` auth guard
 
 ## Status
 
-This covers the core "golden path": register → verify email → sign in (incl. 2FA) → dashboard → place/cancel orders → manage positions → view portfolio → search market data & live prices → generate and review AI signals.
+**Stage 1 (golden path)** — register → verify email → sign in (incl. 2FA) → dashboard → place/cancel orders → manage positions → view portfolio → search market data & live prices → generate and review AI signals.
 
-Not yet implemented (planned as a follow-up): broker connections, billing/subscriptions, and account settings (profile, 2FA setup, sessions, API keys).
+**Stage 2 (complete)** — broker connections (connect/rename/test/sync/disconnect, OAuth-style "connected" redirect page), billing & subscriptions (pricing plans, monthly/annual toggle, subscribe/switch/cancel/reactivate, invoices & usage), and account settings (profile, password change, 2FA setup, active sessions, API key management).
+
+Order placement is wired end-to-end to broker connections: the order form requires selecting an active connection and prompts users to connect a broker first if none exists.

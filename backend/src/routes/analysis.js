@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
-const { getHistoricalData, getCurrentPrice } = require('../services/marketData');
+const { getHistoricalData } = require('../services/marketData');
 const { calculateAll } = require('../services/indicators');
 const { generateSignal } = require('../services/aiAnalysis');
 const { db } = require('../config/database');
@@ -23,18 +23,14 @@ router.post('/generate', authenticate, [
 
   const { symbol, timeframe = '1h' } = req.body;
 
-  // Fetch market data + calculate indicators in parallel
-  const [priceData, histData] = await Promise.all([
-    getCurrentPrice(symbol),
-    getHistoricalData(symbol, timeframe, 250),
-  ]);
+  const histData = await getHistoricalData(symbol, timeframe, 250);
 
   if (!histData.candles.length) {
     return res.status(404).json({ error: `No market data available for ${symbol}` });
   }
 
   const indicators = calculateAll(histData.candles);
-  const signal = await generateSignal(req.user.id, symbol, timeframe, priceData, indicators);
+  const signal = await generateSignal(req.user.id, symbol, timeframe, histData, indicators);
 
   res.json({ signal });
 }));

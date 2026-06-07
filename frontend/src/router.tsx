@@ -15,6 +15,10 @@ import { PortfolioPage } from '@/pages/trading/PortfolioPage'
 import { MarketPage } from '@/pages/market/MarketPage'
 import { SignalsPage } from '@/pages/signals/SignalsPage'
 import { SignalPerformancePage } from '@/pages/signals/SignalPerformancePage'
+import { BrokersPage } from '@/pages/brokers/BrokersPage'
+import { BrokerConnectedPage } from '@/pages/brokers/BrokerConnectedPage'
+import { BillingPage } from '@/pages/billing/BillingPage'
+import { SettingsPage } from '@/pages/settings/SettingsPage'
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -25,6 +29,7 @@ const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      { path: '/brokers/connected', element: <BrokerConnectedPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -35,6 +40,9 @@ const router = createBrowserRouter([
           { path: '/market', element: <MarketPage /> },
           { path: '/signals', element: <SignalsPage /> },
           { path: '/signals/performance', element: <SignalPerformancePage /> },
+          { path: '/brokers', element: <BrokersPage /> },
+          { path: '/billing', element: <BillingPage /> },
+          { path: '/settings', element: <SettingsPage /> },
         ],
       },
     ],

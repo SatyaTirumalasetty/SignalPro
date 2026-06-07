@@ -6,6 +6,9 @@ import {
   LineChart,
   Sparkles,
   BarChart3,
+  Plug,
+  CreditCard,
+  Settings,
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +21,9 @@ const navItems = [
   { to: '/portfolio', label: 'Portfolio', icon: BarChart3 },
   { to: '/market', label: 'Market', icon: LineChart },
   { to: '/signals', label: 'Signals', icon: Sparkles },
+  { to: '/brokers', label: 'Brokers', icon: Plug },
+  { to: '/billing', label: 'Billing', icon: CreditCard },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function AppLayout() {

@@ -499,6 +499,29 @@ aws elbv2 modify-listener \
 
 ---
 
+### Static Analysis & Dependency Scanning (SonarQube + Black Duck)
+
+The CI pipeline (`.github/workflows/ci.yml`) includes gated `sonarqube` and
+`blackduck` jobs that only run real scans once the following repo secrets are
+configured (Settings → Secrets and variables → Actions):
+
+| Secret | Purpose |
+| --- | --- |
+| `SONAR_TOKEN` | Auth token for your SonarQube/SonarCloud instance |
+| `SONAR_HOST_URL` | Base URL of your SonarQube server (omit for SonarCloud) |
+| `BLACKDUCK_URL` | Base URL of your Black Duck Hub |
+| `BLACKDUCK_API_TOKEN` | Black Duck API token with scan permissions |
+
+Project-level Sonar settings live in `sonar-project.properties` at the repo
+root (sources, exclusions, lcov coverage import paths). Given this is a
+financial trading platform, both jobs are configured to **hard-fail the
+build** — the SonarQube quality gate has no soft-fail, and Black Duck is set
+to block on `BLOCKER`/`CRITICAL`/`HIGH` severity findings
+(`blackducksca_scan_failure_severities`). Treat any red result from either
+scan as a release blocker, not a warning to triage later — verify the
+Black Duck action name/version against your tenant's current docs before
+relying on it, since Synopsys has rebranded this tooling more than once.
+
 ### Security Checklist
 
 - [ ] All environment variables in AWS Secrets Manager

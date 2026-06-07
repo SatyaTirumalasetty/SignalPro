@@ -56,7 +56,8 @@
       "!src/__tests__/**"
     ],
     "coverageReporters": [
-      "text"
+      "text",
+      "lcov"
     ],
     "testTimeout": 15000
   },

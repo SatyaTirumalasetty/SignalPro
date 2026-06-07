@@ -393,7 +393,7 @@ CREATE TABLE support_tickets (
   category ticket_category,
   priority ticket_priority DEFAULT 'medium',
   status ticket_status DEFAULT 'open',
-  assigned_to UUID REFERENCES admin_users(id),
+  assigned_to UUID REFERENCES users(id),
   resolution_notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   resolved_at TIMESTAMP

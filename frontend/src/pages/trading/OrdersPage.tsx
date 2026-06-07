@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatDate, formatNumber } from '@/lib/format'
-import type { Order } from '@/types/api'
+import type { BrokerConnection, Order } from '@/types/api'
 
 const statusVariant: Record<string, 'success' | 'danger' | 'muted' | 'default'> = {
   filled: 'success',
@@ -111,12 +112,24 @@ export function OrdersPage() {
 function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const [brokerConnectionId, setBrokerConnectionId] = useState('')
   const [symbol, setSymbol] = useState('')
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [quantity, setQuantity] = useState('')
   const [price, setPrice] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  const connectionsQuery = useQuery({
+    queryKey: ['broker-connections'],
+    queryFn: async () => (await api.get<{ connections: BrokerConnection[] }>('/brokers/connections')).data.connections,
+    enabled: open,
+  })
+  const connections = (connectionsQuery.data ?? []).filter((c) => c.status === 'connected')
+
+  useEffect(() => {
+    if (!brokerConnectionId && connections.length > 0) setBrokerConnectionId(connections[0].id)
+  }, [connections, brokerConnectionId])
 
   const placeMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/trading/orders', payload),
@@ -136,6 +149,7 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
     e.preventDefault()
     setError(null)
     placeMutation.mutate({
+      broker_connection_id: brokerConnectionId,
       symbol: symbol.toUpperCase(),
       side,
       order_type: orderType,
@@ -144,9 +158,39 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
     })
   }
 
+  if (open && !connectionsQuery.isLoading && connections.length === 0) {
+    return (
+      <Dialog open={open} onClose={onClose} title="Place order">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted">
+            You need an active broker connection before you can place orders.
+          </p>
+          <Link
+            to="/brokers"
+            onClick={onClose}
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Connect a broker
+          </Link>
+        </div>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onClose={onClose} title="Place order">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <select
+          value={brokerConnectionId}
+          onChange={(e) => setBrokerConnectionId(e.target.value)}
+          className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
+          required
+        >
+          <option value="" disabled>Select broker connection</option>
+          {connections.map((conn) => (
+            <option key={conn.id} value={conn.id}>{conn.name} ({conn.broker_id})</option>
+          ))}
+        </select>
         <Input placeholder="Symbol (e.g. AAPL)" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
         <div className="grid grid-cols-2 gap-3">
           <select

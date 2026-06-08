@@ -70,22 +70,97 @@ services:
       retries: 3
       start_period: 15s
 
-  # ── Frontend (static build served by Nginx) ─────────────────────────────────
+  # ── Frontend shell (static build served by Nginx) ───────────────────────────
+  # Hosts auth/layout/routing/dashboard and loads the remotes below at runtime
+  # via Module Federation — the VITE_*_REMOTE_URL build args must be reachable
+  # from the *browser*, not just from inside the build container.
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-      target: runner
+      target: shell
       args:
         VITE_API_BASE_URL: http://localhost:3001
+        VITE_TRADING_REMOTE_URL: http://localhost:5174/remoteEntry.js
+        VITE_MARKET_REMOTE_URL: http://localhost:5175/remoteEntry.js
+        VITE_ADMIN_REMOTE_URL: http://localhost:5176/remoteEntry.js
     restart: unless-stopped
     ports:
       - "5173:8080"
     depends_on:
       backend:
         condition: service_healthy
+      trading_remote:
+        condition: service_healthy
+      market_remote:
+        condition: service_healthy
+      admin_remote:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Trading remote (orders/positions/portfolio/brokers/billing/settings) ────
+  trading_remote:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: trading_remote
+      args:
+        VITE_API_BASE_URL: http://localhost:3001
+    restart: unless-stopped
+    ports:
+      - "5174:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/remoteEntry.js || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Market remote (market data, signals, TradingView charts) ────────────────
+  market_remote:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: market_remote
+      args:
+        VITE_API_BASE_URL: http://localhost:3001
+    restart: unless-stopped
+    ports:
+      - "5175:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/remoteEntry.js || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Admin remote ─────────────────────────────────────────────────────────────
+  admin_remote:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: admin_remote
+      args:
+        VITE_API_BASE_URL: http://localhost:3001
+    restart: unless-stopped
+    ports:
+      - "5176:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/remoteEntry.js || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -13,7 +13,14 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Run on first init only (fresh data dir), in lexical order — base schema then migrations.
+      # Adding a new file under database/migrations/ requires a new line here to seed fresh DBs;
+      # existing DBs pick it up via `npm run migrate` (backend/src/database/migrate.js) instead.
+      - ./database/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      - ./database/migrations/001_phase1_additions.sql:/docker-entrypoint-initdb.d/01-001_phase1_additions.sql:ro
+      - ./database/migrations/002_phase2_additions.sql:/docker-entrypoint-initdb.d/02-002_phase2_additions.sql:ro
+      - ./database/migrations/003_users_role_column.sql:/docker-entrypoint-initdb.d/03-003_users_role_column.sql:ro
+      - ./database/migrations/004_support_ticket_assigned_to_fk.sql:/docker-entrypoint-initdb.d/04-004_support_ticket_assigned_to_fk.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U signalpro -d signalpro"]
       interval: 10s

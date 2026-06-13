@@ -5,6 +5,7 @@ const { db } = require('../config/database');
 const { decryptCredentials } = require('../config/brokerEncryption');
 const { getAdapter } = require('../services/brokers/index');
 const { getCurrentPrice } = require('../services/marketData');
+const { placeOrder } = require('../services/orderExecution');
 const riskManagement = require('../services/riskManagement');
 const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -75,49 +76,16 @@ router.post('/orders', authenticate, [
     logger.warn({ userId: req.user.id, err: err.message }, 'Risk management check failed — proceeding without sizing');
   }
 
-  // Create order record first (status: pending)
-  const orderId = uuidv4();
-  await db.none(
-    `INSERT INTO orders (id, user_id, broker_connection_id, symbol, order_type, side,
-                         quantity, price, stop_loss, take_profit, status, signal_id, created_by_ai, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-    [orderId, req.user.id, broker_connection_id, symbol, order_type, side,
-     finalQuantity, currentPrice, stop_loss || null, take_profit || null, signal_id || null, !!signal_id]
-  );
-
-  // Submit to broker asynchronously
-  executeOrderAsync(orderId, req.user.id, conn, symbol, side, order_type, finalQuantity, currentPrice, stop_loss, take_profit);
-
-  res.status(201).json({
-    order: { id: orderId, symbol, side, order_type, quantity: finalQuantity, price: currentPrice, stop_loss: stop_loss || null, take_profit: take_profit || null, status: 'pending' },
-    message: 'Order submitted',
+  // Create order record (status: pending) and submit to broker asynchronously
+  const order = await placeOrder({
+    userId: req.user.id, brokerConnectionId: broker_connection_id, conn, symbol, side,
+    orderType: order_type, quantity: finalQuantity, price: currentPrice,
+    stopLoss: stop_loss, takeProfit: take_profit, signalId: signal_id,
+    source: signal_id ? 'manual_signal' : 'manual',
   });
+
+  res.status(201).json({ order, message: 'Order submitted' });
 }));
-
-async function executeOrderAsync(orderId, userId, conn, symbol, side, orderType, quantity, price, stopLoss, takeProfit) {
-  try {
-    const credentials = decryptCredentials(conn.credentials_encrypted);
-    const adapter = getAdapter(conn.broker_id, credentials);
-
-    const result = await adapter.placeOrder?.({
-      symbol, side, order_type: orderType, quantity, price, stop_loss: stopLoss, take_profit: takeProfit,
-    });
-
-    await db.none(
-      `UPDATE orders SET status = 'open', broker_order_id = $1, order_message = $2,
-              executed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [result?.order_id || null, result?.message || 'Order submitted to broker', orderId]
-    );
-  } catch (err) {
-    logger.warn({ orderId, err: err.message }, 'Order execution failed');
-    await db.none(
-      `UPDATE orders SET status = 'rejected', error_message = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [err.message, orderId]
-    ).catch(() => {});
-  }
-}
 
 // ── GET /api/trading/orders ───────────────────────────────────────────────────
 

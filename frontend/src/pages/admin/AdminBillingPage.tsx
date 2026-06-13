@@ -51,7 +51,7 @@ export function AdminBillingPage() {
           {!mrr?.monthly_breakdown?.length && <p className="text-sm text-muted">No billing history yet.</p>}
           {!!mrr?.monthly_breakdown?.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Month</TableHead>
                   <TableHead>MRR</TableHead>
@@ -81,7 +81,7 @@ export function AdminBillingPage() {
           {!revenueQuery.isLoading && plans.length === 0 && <p className="text-sm text-muted">No active plans.</p>}
           {!!plans.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Plan</TableHead>
                   <TableHead>Tier</TableHead>

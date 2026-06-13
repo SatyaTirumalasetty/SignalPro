@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatDate, formatNumber } from '@/lib/format'
@@ -51,16 +52,16 @@ export function BacktestPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <Input placeholder="Symbol (e.g. AAPL)" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
-            <select
+            <Select
               value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value)}
-              className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-            >
-              <option value="1d">1 day</option>
-              <option value="1h">1 hour</option>
-              <option value="15m">15 minutes</option>
-              <option value="5m">5 minutes</option>
-            </select>
+              onValueChange={setTimeframe}
+              options={[
+                { value: '1d', label: '1 day' },
+                { value: '1h', label: '1 hour' },
+                { value: '15m', label: '15 minutes' },
+                { value: '5m', label: '5 minutes' },
+              ]}
+            />
             <Input
               type="number"
               placeholder="Bars"
@@ -113,7 +114,7 @@ export function BacktestPage() {
               {result.trades.length === 0 && <p className="text-sm text-muted">No trades were generated for this window.</p>}
               {result.trades.length > 0 && (
                 <Table>
-                  <TableHeader>
+                  <TableHeader sticky>
                     <TableRow>
                       <TableHead>Entry time</TableHead>
                       <TableHead>Exit time</TableHead>

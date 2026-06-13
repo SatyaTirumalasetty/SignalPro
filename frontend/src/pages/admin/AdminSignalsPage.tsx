@@ -57,7 +57,7 @@ export function AdminSignalsPage() {
           {!performanceQuery.isLoading && bySymbol.length === 0 && <p className="text-sm text-muted">No signal data yet.</p>}
           {!!bySymbol.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Type</TableHead>

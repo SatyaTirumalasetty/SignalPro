@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
@@ -104,7 +105,7 @@ export function AdminOverviewPage() {
           )}
           {!!alerts.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Type</TableHead>
                   <TableHead>Severity</TableHead>
@@ -139,7 +140,7 @@ export function AdminOverviewPage() {
           {!health?.recent_errors?.length && <p className="text-sm text-muted">No recent errors.</p>}
           {!!health?.recent_errors?.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Action</TableHead>
                   <TableHead>Entity</TableHead>
@@ -165,15 +166,15 @@ export function AdminOverviewPage() {
       <Dialog open={alertDialogOpen} onClose={() => setAlertDialogOpen(false)} title="Create system alert">
         <form onSubmit={handleCreateAlert} className="flex flex-col gap-3">
           <Input placeholder="Alert type (e.g. broker_outage)" value={alertType} onChange={(e) => setAlertType(e.target.value)} required />
-          <select
+          <Select
             value={severity}
-            onChange={(e) => setSeverity(e.target.value as 'info' | 'warning' | 'critical')}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="critical">Critical</option>
-          </select>
+            onValueChange={(value) => setSeverity(value as 'info' | 'warning' | 'critical')}
+            options={[
+              { value: 'info', label: 'Info' },
+              { value: 'warning', label: 'Warning' },
+              { value: 'critical', label: 'Critical' },
+            ]}
+          />
           <Input placeholder="Message" value={message} onChange={(e) => setMessage(e.target.value)} required />
           <Button type="submit" disabled={createAlertMutation.isPending}>
             {createAlertMutation.isPending ? 'Creating…' : 'Create alert'}

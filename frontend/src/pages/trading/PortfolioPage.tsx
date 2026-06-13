@@ -46,7 +46,7 @@ export function PortfolioPage() {
           {data?.positions.length === 0 && <p className="text-sm text-muted">No holdings yet.</p>}
           {!!data?.positions.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Type</TableHead>

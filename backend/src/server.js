@@ -11,6 +11,7 @@ const { helmetOptions } = require('./config/security');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
+const { startAutoTradingCron } = require('./services/autoTradingEngine');
 const alpacaMarketData = require('./services/alpacaMarketData');
 const logger = require('./config/logger');
 
@@ -27,6 +28,7 @@ const billingRoutes = require('./routes/billing');
 const subscriptionRoutes = require('./routes/subscriptions');
 const adminRoutes = require('./routes/admin');
 const backtestRoutes = require('./routes/backtest');
+const autoTradingRoutes = require('./routes/autoTrading');
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +80,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/backtest', backtestRoutes);
+app.use('/api/auto-trading', autoTradingRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((req, res) => {
@@ -165,6 +168,7 @@ async function start() {
     logger.info('✅ Database initialized');
     
     startCronJobs();
+    startAutoTradingCron();
     server.listen(PORT, () => {
       logger.info(`
 ╔════════════════════════════════════════════════╗

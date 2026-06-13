@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
@@ -90,35 +91,37 @@ export function AdminSupportPage() {
 
       <Card>
         <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center">
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value)
+          <Select
+            value={statusFilter || 'all'}
+            onValueChange={(value) => {
+              setStatusFilter(value === 'all' ? '' : value)
               setOffset(0)
             }}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="waiting_customer">Waiting on customer</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select
-            value={priorityFilter}
-            onChange={(e) => {
-              setPriorityFilter(e.target.value)
+            className="sm:w-48"
+            options={[
+              { value: 'all', label: 'All statuses' },
+              { value: 'open', label: 'Open' },
+              { value: 'in_progress', label: 'In progress' },
+              { value: 'waiting_customer', label: 'Waiting on customer' },
+              { value: 'resolved', label: 'Resolved' },
+              { value: 'closed', label: 'Closed' },
+            ]}
+          />
+          <Select
+            value={priorityFilter || 'all'}
+            onValueChange={(value) => {
+              setPriorityFilter(value === 'all' ? '' : value)
               setOffset(0)
             }}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="">All priorities</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
+            className="sm:w-48"
+            options={[
+              { value: 'all', label: 'All priorities' },
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+              { value: 'critical', label: 'Critical' },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -139,7 +142,7 @@ export function AdminSupportPage() {
           {!ticketsQuery.isLoading && tickets.length === 0 && <p className="text-sm text-muted">No tickets match these filters.</p>}
           {!!tickets.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Ticket</TableHead>
                   <TableHead>User</TableHead>

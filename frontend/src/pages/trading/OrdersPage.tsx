@@ -22,10 +22,16 @@ export function OrdersPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   const ordersQuery = useQuery({
     queryKey: ['orders'],
     queryFn: async () => (await api.get<{ orders: Order[] }>('/trading/orders')).data.orders,
+  })
+
+  const orders = [...(ordersQuery.data ?? [])].sort((a, b) => {
+    const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    return sortDirection === 'asc' ? diff : -diff
   })
 
   const cancelMutation = useMutation({
@@ -56,7 +62,7 @@ export function OrdersPage() {
           {ordersQuery.data?.length === 0 && <p className="text-sm text-muted">No orders yet.</p>}
           {!!ordersQuery.data?.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Side</TableHead>
@@ -65,12 +71,17 @@ export function OrdersPage() {
                   <TableHead>Price</TableHead>
                   <TableHead>SL / TP</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead
+                    sortDirection={sortDirection}
+                    onSort={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  >
+                    Created
+                  </TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ordersQuery.data.map((order) => (
+                {orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium text-foreground">{order.symbol}</TableCell>
                     <TableCell>

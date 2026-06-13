@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import type { BrokerConnection } from '@/types/api'
@@ -118,35 +119,30 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
             Pre-filled from an AI signal for {initialValues.symbol}. Review the details before submitting.
           </p>
         )}
-        <select
+        <Select
           value={brokerConnectionId}
-          onChange={(e) => setBrokerConnectionId(e.target.value)}
-          className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          required
-        >
-          <option value="" disabled>Select broker connection</option>
-          {connections.map((conn) => (
-            <option key={conn.id} value={conn.id}>{conn.name} ({conn.broker_id})</option>
-          ))}
-        </select>
+          onValueChange={setBrokerConnectionId}
+          placeholder="Select broker connection"
+          options={connections.map((conn) => ({ value: conn.id, label: `${conn.name} (${conn.broker_id})` }))}
+        />
         <Input placeholder="Symbol (e.g. AAPL)" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
         <div className="grid grid-cols-2 gap-3">
-          <select
+          <Select
             value={side}
-            onChange={(e) => setSide(e.target.value as 'buy' | 'sell')}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
-          </select>
-          <select
+            onValueChange={(value) => setSide(value as 'buy' | 'sell')}
+            options={[
+              { value: 'buy', label: 'Buy' },
+              { value: 'sell', label: 'Sell' },
+            ]}
+          />
+          <Select
             value={orderType}
-            onChange={(e) => setOrderType(e.target.value as 'market' | 'limit')}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="market">Market</option>
-            <option value="limit">Limit</option>
-          </select>
+            onValueChange={(value) => setOrderType(value as 'market' | 'limit')}
+            options={[
+              { value: 'market', label: 'Market' },
+              { value: 'limit', label: 'Limit' },
+            ]}
+          />
         </div>
         <Input
           type="number"

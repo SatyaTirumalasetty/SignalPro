@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatCurrency, formatDate, formatNumber, formatPercent } from '@/lib/format'
@@ -37,14 +38,12 @@ export function PositionsPage() {
         <p className="text-sm text-muted">Track your open and closed positions</p>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant={tab === 'open' ? 'default' : 'outline'} size="sm" onClick={() => setTab('open')}>
-          Open
-        </Button>
-        <Button variant={tab === 'closed' ? 'default' : 'outline'} size="sm" onClick={() => setTab('closed')}>
-          Closed
-        </Button>
-      </div>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as 'open' | 'closed')}>
+        <TabsList>
+          <TabsTrigger value="open">Open</TabsTrigger>
+          <TabsTrigger value="closed">Closed</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <Card>
         <CardHeader>
@@ -55,7 +54,7 @@ export function PositionsPage() {
           {positionsQuery.data?.length === 0 && <p className="text-sm text-muted">No {tab} positions.</p>}
           {!!positionsQuery.data?.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Type</TableHead>

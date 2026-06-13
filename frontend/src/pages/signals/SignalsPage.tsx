@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PlaceOrderDialog } from '@/components/trading/PlaceOrderDialog'
 import { useToast } from '@/hooks/useToast'
@@ -73,15 +74,15 @@ export function SignalsPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted">Timeframe</label>
-              <select
+              <Select
                 value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-              >
-                <option value="15m">15 minutes</option>
-                <option value="1h">1 hour</option>
-                <option value="4h">4 hours</option>
-              </select>
+                onValueChange={setTimeframe}
+                options={[
+                  { value: '15m', label: '15 minutes' },
+                  { value: '1h', label: '1 hour' },
+                  { value: '4h', label: '4 hours' },
+                ]}
+              />
             </div>
             <Button type="submit" disabled={generateMutation.isPending}>
               {generateMutation.isPending ? 'Generating…' : 'Generate signal'}
@@ -100,7 +101,7 @@ export function SignalsPage() {
           {signalsQuery.data?.length === 0 && <p className="text-sm text-muted">No signals yet.</p>}
           {!!signalsQuery.data?.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Type</TableHead>

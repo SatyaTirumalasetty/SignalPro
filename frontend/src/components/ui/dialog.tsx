@@ -1,5 +1,5 @@
-import { type ReactNode, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { type ReactNode } from 'react'
+import * as RadixDialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,33 +12,25 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, className }: DialogProps) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div
-        className={cn(
-          'relative z-10 w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-xl',
-          className,
-        )}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-foreground cursor-pointer">
-            <X size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
-    document.body,
+  return (
+    <RadixDialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <RadixDialog.Content
+          className={cn(
+            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 shadow-xl outline-none',
+            className,
+          )}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <RadixDialog.Title className="text-base font-semibold text-foreground">{title}</RadixDialog.Title>
+            <RadixDialog.Close className="text-muted hover:text-foreground cursor-pointer">
+              <X size={18} />
+            </RadixDialog.Close>
+          </div>
+          {children}
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
+    </RadixDialog.Root>
   )
 }

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
@@ -119,32 +120,34 @@ export function AdminUsersPage() {
             }}
             className="sm:max-w-xs"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value)
+          <Select
+            value={statusFilter || 'all'}
+            onValueChange={(value) => {
+              setStatusFilter(value === 'all' ? '' : value)
               setOffset(0)
             }}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
-            <option value="deleted">Deleted</option>
-          </select>
-          <select
-            value={kycFilter}
-            onChange={(e) => {
-              setKycFilter(e.target.value)
+            className="sm:w-48"
+            options={[
+              { value: 'all', label: 'All statuses' },
+              { value: 'active', label: 'Active' },
+              { value: 'suspended', label: 'Suspended' },
+              { value: 'deleted', label: 'Deleted' },
+            ]}
+          />
+          <Select
+            value={kycFilter || 'all'}
+            onValueChange={(value) => {
+              setKycFilter(value === 'all' ? '' : value)
               setOffset(0)
             }}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
-          >
-            <option value="">All KYC statuses</option>
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="rejected">Rejected</option>
-          </select>
+            className="sm:w-48"
+            options={[
+              { value: 'all', label: 'All KYC statuses' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'verified', label: 'Verified' },
+              { value: 'rejected', label: 'Rejected' },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -175,7 +178,7 @@ export function AdminUsersPage() {
           {!usersQuery.isLoading && users.length === 0 && <p className="text-sm text-muted">No users match these filters.</p>}
           {!!users.length && (
             <Table>
-              <TableHeader>
+              <TableHeader sticky>
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Status</TableHead>

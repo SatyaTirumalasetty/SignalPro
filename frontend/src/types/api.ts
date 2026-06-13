@@ -436,3 +436,36 @@ export interface SystemHealth {
     created_at: string
   }>
 }
+
+export interface AutoTradingSettings {
+  enabled: boolean
+  broker_connection_id: string | null
+  symbols: string[]
+  timeframes: string[]
+  min_confidence: number
+  risk_per_trade_pct: number
+  max_daily_loss_pct: number
+  cooldown_minutes: number
+  max_trades_per_day: number
+}
+
+export interface AutoTradingRun {
+  id: string
+  symbol: string
+  timeframe: string
+  decision: string | null
+  confidence: number | null
+  action: string
+  signal_id: string | null
+  order_id: string | null
+  reasoning: string | null
+  error_message: string | null
+  created_at: string
+}
+
+export interface AutoTradingStatus {
+  enabled: boolean
+  last_run_at: string | null
+  trades_today: number
+  todays_pnl: number
+}

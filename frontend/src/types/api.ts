@@ -29,10 +29,46 @@ export interface Order {
   order_type: string
   quantity: number
   price?: number
+  stop_loss?: number | null
+  take_profit?: number | null
   status: string
   broker_order_id?: string
   executed_at?: string
   created_at?: string
+}
+
+export interface BacktestSummary {
+  total_trades: number
+  win_count: number
+  loss_count: number
+  win_rate: number
+  avg_win: number
+  avg_loss: number
+  total_return_pct: number
+  max_drawdown_pct: number
+  initial_equity: number
+  final_equity: number
+}
+
+export interface BacktestTrade {
+  entry_time: string
+  exit_time: string
+  entry_price: number
+  exit_price: number
+  quantity: number
+  pnl: number
+  exit_reason: string
+}
+
+export interface BacktestEquityPoint {
+  time: string
+  equity: number
+}
+
+export interface BacktestResult {
+  summary: BacktestSummary
+  trades: BacktestTrade[]
+  equity_curve: BacktestEquityPoint[]
 }
 
 export interface Position {

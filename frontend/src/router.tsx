@@ -14,6 +14,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { OrdersPage } from '@/pages/trading/OrdersPage'
 import { PositionsPage } from '@/pages/trading/PositionsPage'
 import { PortfolioPage } from '@/pages/trading/PortfolioPage'
+import { BacktestPage } from '@/pages/trading/BacktestPage'
 import { MarketPage } from '@/pages/market/MarketPage'
 import { SignalsPage } from '@/pages/signals/SignalsPage'
 import { SignalPerformancePage } from '@/pages/signals/SignalPerformancePage'
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
           { path: '/', element: <DashboardPage /> },
           { path: '/trading/orders', element: <OrdersPage /> },
           { path: '/trading/positions', element: <PositionsPage /> },
+          { path: '/trading/backtest', element: <BacktestPage /> },
           { path: '/portfolio', element: <PortfolioPage /> },
           { path: '/market', element: <MarketPage /> },
           { path: '/signals', element: <SignalsPage /> },

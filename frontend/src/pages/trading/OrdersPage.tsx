@@ -65,6 +65,7 @@ export function OrdersPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Qty</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>SL / TP</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead />
@@ -80,6 +81,11 @@ export function OrdersPage() {
                     <TableCell className="text-muted">{order.order_type}</TableCell>
                     <TableCell>{formatNumber(order.quantity)}</TableCell>
                     <TableCell>{order.price ? formatNumber(order.price) : 'Market'}</TableCell>
+                    <TableCell className="text-muted">
+                      {order.stop_loss || order.take_profit
+                        ? `${order.stop_loss ? formatNumber(order.stop_loss) : '—'} / ${order.take_profit ? formatNumber(order.take_profit) : '—'}`
+                        : '—'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[order.status?.toLowerCase()] ?? 'muted'}>{order.status}</Badge>
                     </TableCell>
@@ -118,6 +124,8 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [quantity, setQuantity] = useState('')
   const [price, setPrice] = useState('')
+  const [stopLoss, setStopLoss] = useState('')
+  const [takeProfit, setTakeProfit] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const connectionsQuery = useQuery({
@@ -140,6 +148,8 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
       setSymbol('')
       setQuantity('')
       setPrice('')
+      setStopLoss('')
+      setTakeProfit('')
       onClose()
     },
     onError: (err) => setError(getApiErrorMessage(err)),
@@ -155,6 +165,8 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
       order_type: orderType,
       quantity: Number(quantity),
       ...(orderType === 'limit' ? { price: Number(price) } : {}),
+      ...(stopLoss ? { stop_loss: Number(stopLoss) } : {}),
+      ...(takeProfit ? { take_profit: Number(takeProfit) } : {}),
     })
   }
 
@@ -230,6 +242,27 @@ function PlaceOrderDialog({ open, onClose }: { open: boolean; onClose: () => voi
             required
           />
         )}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            type="number"
+            placeholder="Stop loss (optional)"
+            value={stopLoss}
+            onChange={(e) => setStopLoss(e.target.value)}
+            min="0"
+            step="any"
+          />
+          <Input
+            type="number"
+            placeholder="Take profit (optional)"
+            value={takeProfit}
+            onChange={(e) => setTakeProfit(e.target.value)}
+            min="0"
+            step="any"
+          />
+        </div>
+        <p className="text-xs text-muted">
+          Setting a stop loss enables risk-based position sizing and submits a bracket order to the broker.
+        </p>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button type="submit" disabled={placeMutation.isPending}>
           {placeMutation.isPending ? 'Placing…' : 'Place order'}

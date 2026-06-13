@@ -34,13 +34,15 @@ describe('loadSecrets()', () => {
   test('merges secret values into process.env', async () => {
     process.env.AWS_SECRETS_MANAGER_SECRET_ID = 'signalpro/prod';
     delete process.env.SOME_NEW_SECRET;
+    delete process.env.ANOTHER_NEW_SECRET;
     mockSend.mockResolvedValueOnce({
-      SecretString: JSON.stringify({ SOME_NEW_SECRET: 'value-from-aws', ANTHROPIC_API_KEY: 'aws-key' }),
+      SecretString: JSON.stringify({ SOME_NEW_SECRET: 'value-from-aws', ANOTHER_NEW_SECRET: 'also-from-aws' }),
     });
 
     await loadSecrets();
 
     expect(process.env.SOME_NEW_SECRET).toBe('value-from-aws');
+    expect(process.env.ANOTHER_NEW_SECRET).toBe('also-from-aws');
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ secretId: 'signalpro/prod', keysFound: 2, applied: 2 }),
       expect.any(String)

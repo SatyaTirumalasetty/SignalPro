@@ -2,12 +2,14 @@ const request = require('supertest');
 const express = require('express');
 
 const mockGetCurrentPrice = jest.fn();
+const mockGetLiveQuote = jest.fn();
 const mockGetHistoricalData = jest.fn();
 const mockSearchSymbols = jest.fn();
 const mockCalculateAll = jest.fn();
 
 jest.mock('../../services/marketData', () => ({
   getCurrentPrice: mockGetCurrentPrice,
+  getLiveQuote: mockGetLiveQuote,
   getHistoricalData: mockGetHistoricalData,
   searchSymbols: mockSearchSymbols,
 }));
@@ -47,9 +49,14 @@ const MOCK_INDICATORS = {
   current_price: 150, price_change_pct: 0.5,
 };
 
+const MOCK_QUOTE = {
+  symbol: 'AAPL', source: 'alpaca', price: 150.25, bid: 150.20, ask: 150.30, timestamp: new Date().toISOString(),
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetCurrentPrice.mockResolvedValue(MOCK_PRICE);
+  mockGetLiveQuote.mockResolvedValue(MOCK_QUOTE);
   mockGetHistoricalData.mockResolvedValue(MOCK_HIST);
   mockSearchSymbols.mockResolvedValue([{ symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NMS', type: 'EQUITY' }]);
   mockCalculateAll.mockReturnValue(MOCK_INDICATORS);
@@ -100,6 +107,26 @@ describe('GET /api/market/price/:symbol', () => {
   test('propagates 404 from service', async () => {
     mockGetCurrentPrice.mockRejectedValueOnce(Object.assign(new Error('not found'), { status: 404 }));
     const res = await request(app).get('/api/market/price/INVALID');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/market/quote/:symbol', () => {
+  test('returns live quote for valid symbol', async () => {
+    const res = await request(app).get('/api/market/quote/AAPL');
+    expect(res.status).toBe(200);
+    expect(res.body.quote.symbol).toBe('AAPL');
+    expect(res.body.quote.source).toBe('alpaca');
+  });
+
+  test('calls getLiveQuote with uppercase symbol', async () => {
+    await request(app).get('/api/market/quote/aapl');
+    expect(mockGetLiveQuote).toHaveBeenCalledWith('AAPL');
+  });
+
+  test('propagates service errors', async () => {
+    mockGetLiveQuote.mockRejectedValueOnce(Object.assign(new Error('not found'), { status: 404 }));
+    const res = await request(app).get('/api/market/quote/INVALID');
     expect(res.status).toBe(404);
   });
 });

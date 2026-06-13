@@ -3,10 +3,15 @@ jest.mock('../../config/redis', () => ({
   cacheGet: jest.fn().mockResolvedValue(null),
   cacheSet: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../services/alpacaMarketData', () => ({
+  isConfigured: jest.fn(),
+  getLatestQuotes: jest.fn(),
+}));
 
 const axios = require('axios');
 const { cacheGet, cacheSet } = require('../../config/redis');
-const { getCurrentPrice, getHistoricalData, searchSymbols } = require('../../services/marketData');
+const alpacaMarketData = require('../../services/alpacaMarketData');
+const { getCurrentPrice, getLiveQuote, getHistoricalData, searchSymbols } = require('../../services/marketData');
 
 const MOCK_META = {
   symbol: 'AAPL',
@@ -56,6 +61,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   cacheGet.mockResolvedValue(null);
   cacheSet.mockResolvedValue(undefined);
+  alpacaMarketData.isConfigured.mockReturnValue(false);
 });
 
 describe('getCurrentPrice()', () => {
@@ -107,6 +113,47 @@ describe('getCurrentPrice()', () => {
   test('throws when chart result is empty', async () => {
     axios.get.mockResolvedValueOnce({ data: { chart: { result: null } } });
     await expect(getCurrentPrice('AAPL')).rejects.toThrow();
+  });
+});
+
+describe('getLiveQuote()', () => {
+  test('returns Alpaca quote when configured and available', async () => {
+    alpacaMarketData.isConfigured.mockReturnValue(true);
+    alpacaMarketData.getLatestQuotes.mockResolvedValueOnce({
+      AAPL: { price: 150.25, bid: 150.20, ask: 150.30, timestamp: '2024-01-01T00:00:00Z' },
+    });
+
+    const quote = await getLiveQuote('AAPL');
+    expect(quote).toEqual({
+      symbol: 'AAPL',
+      source: 'alpaca',
+      price: 150.25,
+      bid: 150.20,
+      ask: 150.30,
+      timestamp: '2024-01-01T00:00:00Z',
+    });
+  });
+
+  test('falls back to Yahoo when Alpaca is configured but has no data', async () => {
+    alpacaMarketData.isConfigured.mockReturnValue(true);
+    alpacaMarketData.getLatestQuotes.mockResolvedValueOnce({});
+    axios.get.mockResolvedValueOnce(MOCK_CHART_RESPONSE);
+
+    const quote = await getLiveQuote('AAPL');
+    expect(quote.source).toBe('yahoo');
+    expect(quote.price).toBe(150.00);
+    expect(quote.bid).toBeNull();
+    expect(quote.ask).toBeNull();
+  });
+
+  test('falls back to Yahoo when Alpaca is not configured', async () => {
+    alpacaMarketData.isConfigured.mockReturnValue(false);
+    axios.get.mockResolvedValueOnce(MOCK_CHART_RESPONSE);
+
+    const quote = await getLiveQuote('AAPL');
+    expect(quote.source).toBe('yahoo');
+    expect(alpacaMarketData.getLatestQuotes).not.toHaveBeenCalled();
+    expect(quote.symbol).toBe('AAPL');
   });
 });
 

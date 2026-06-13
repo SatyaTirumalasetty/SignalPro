@@ -188,4 +188,57 @@ describe('generateSignal()', () => {
     const result = await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
     expect(result.indicators).toEqual(MOCK_INDICATORS);
   });
+
+  describe('with news headlines', () => {
+    const MOCK_NEWS = [
+      { id: 1, headline: 'Apple unveils new product', source: 'Benzinga', created_at: '2024-01-01T00:00:00Z' },
+    ];
+
+    test('folds news into the returned indicators', async () => {
+      mockMessageCreate.mockResolvedValueOnce({
+        content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+        usage: { input_tokens: 400, output_tokens: 200 },
+      });
+
+      const result = await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS, MOCK_NEWS);
+      expect(result.indicators.news).toEqual(MOCK_NEWS);
+      expect(result.indicators.rsi_14).toBe(MOCK_INDICATORS.rsi_14);
+    });
+
+    test('includes news headlines in the prompt sent to the AI', async () => {
+      mockMessageCreate.mockResolvedValueOnce({
+        content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+        usage: { input_tokens: 400, output_tokens: 200 },
+      });
+
+      await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS, MOCK_NEWS);
+      const promptArg = mockMessageCreate.mock.calls[0][0].messages[0].content;
+      expect(promptArg).toContain('Recent News Headlines');
+      expect(promptArg).toContain('Apple unveils new product');
+    });
+
+    test('persists news-enriched indicators to the database', async () => {
+      mockMessageCreate.mockResolvedValueOnce({
+        content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+        usage: { input_tokens: 400, output_tokens: 200 },
+      });
+
+      await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS, MOCK_NEWS);
+      const insertParams = mockDb.one.mock.calls[0][1];
+      const indicatorsJson = insertParams[13];
+      expect(JSON.parse(indicatorsJson).news).toEqual(MOCK_NEWS);
+    });
+
+    test('prompt notes when no news is available', async () => {
+      mockMessageCreate.mockResolvedValueOnce({
+        content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+        usage: { input_tokens: 400, output_tokens: 200 },
+      });
+
+      await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
+      const promptArg = mockMessageCreate.mock.calls[0][0].messages[0].content;
+      expect(promptArg).toContain('None available.');
+      expect(mockDb.one.mock.calls[0][1][13]).not.toContain('"news"');
+    });
+  });
 });

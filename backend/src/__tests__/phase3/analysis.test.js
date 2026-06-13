@@ -12,6 +12,7 @@ const mockGetCurrentPrice = jest.fn();
 const mockGetHistoricalData = jest.fn();
 const mockCalculateAll = jest.fn();
 const mockGenerateSignal = jest.fn();
+const mockGetNews = jest.fn();
 
 jest.mock('../../config/database', () => ({ db: mockDb }));
 jest.mock('../../services/marketData', () => ({
@@ -20,6 +21,7 @@ jest.mock('../../services/marketData', () => ({
 }));
 jest.mock('../../services/indicators', () => ({ calculateAll: mockCalculateAll }));
 jest.mock('../../services/aiAnalysis', () => ({ generateSignal: mockGenerateSignal }));
+jest.mock('../../services/alpacaMarketData', () => ({ getNews: mockGetNews }));
 
 const router = require('../../routes/analysis');
 
@@ -57,6 +59,10 @@ const MOCK_SIGNAL = {
   cached: false,
 };
 
+const MOCK_NEWS = [
+  { id: 1, headline: 'Apple unveils new product', source: 'Benzinga', created_at: '2024-01-01T00:00:00Z' },
+];
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockDb.none.mockResolvedValue(undefined);
@@ -64,6 +70,7 @@ beforeEach(() => {
   mockGetHistoricalData.mockResolvedValue(MOCK_HIST);
   mockCalculateAll.mockReturnValue(MOCK_INDICATORS);
   mockGenerateSignal.mockResolvedValue(MOCK_SIGNAL);
+  mockGetNews.mockResolvedValue(MOCK_NEWS);
 });
 
 const app = createApp();
@@ -115,6 +122,18 @@ describe('POST /api/analysis/generate', () => {
       .set('Authorization', authHeader)
       .send({ symbol: 'AAPL' });
     expect(mockGetHistoricalData).toHaveBeenCalledWith('AAPL', '1h', 250);
+  });
+
+  test('fetches news for the symbol and passes it to generateSignal', async () => {
+    await request(app)
+      .post('/api/analysis/generate')
+      .set('Authorization', authHeader)
+      .send({ symbol: 'AAPL', timeframe: '1h' });
+
+    expect(mockGetNews).toHaveBeenCalledWith(['AAPL'], 5);
+    expect(mockGenerateSignal).toHaveBeenCalledWith(
+      USER_ID, 'AAPL', '1h', MOCK_HIST, MOCK_INDICATORS, MOCK_NEWS
+    );
   });
 });
 

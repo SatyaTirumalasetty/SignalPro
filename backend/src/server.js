@@ -30,8 +30,14 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // ─── Security & Middleware ────────────────────────────────────
+// JSON-only API: lock down CSP entirely since no HTML/scripts are served here.
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
   hsts: { maxAge: 31536000, includeSubDomains: true },
 }));
 

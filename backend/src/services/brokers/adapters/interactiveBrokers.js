@@ -6,20 +6,34 @@ const BaseAdapter = require('./base');
 // Default: https://api.ibkr.com/v1/api (requires OAuth 2.0 session)
 // Self-hosted gateway: https://localhost:5000/v1/api
 
+// Only the official IBKR cloud gateway or a local self-hosted gateway are
+// permitted as the API base — prevents SSRF via an arbitrary user-supplied URL.
+const DEFAULT_GATEWAY = 'https://api.ibkr.com/v1/api';
+const LOCAL_GATEWAY_RE = /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/v1\/api$/;
+
 class InteractiveBrokersAdapter extends BaseAdapter {
   constructor(credentials) {
     super('interactive_brokers', credentials);
-    const base = credentials.gateway_url || 'https://api.ibkr.com/v1/api';
+    const base = InteractiveBrokersAdapter.resolveGatewayUrl(credentials.gateway_url);
     this.http = axios.create({
       baseURL: base,
       headers: { Authorization: `Bearer ${credentials.access_token}` },
       timeout: 15000,
       // Self-hosted gateway uses self-signed cert; disable SSL check only in dev
-      ...(credentials.gateway_url?.includes('localhost') && {
+      ...(base !== DEFAULT_GATEWAY && {
         httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
       }),
     });
     this.accountId = credentials.account_id;
+  }
+
+  static resolveGatewayUrl(gatewayUrl) {
+    if (!gatewayUrl) return DEFAULT_GATEWAY;
+    if (gatewayUrl === DEFAULT_GATEWAY || LOCAL_GATEWAY_RE.test(gatewayUrl)) return gatewayUrl;
+    const err = new Error('Invalid gateway_url: must be the IBKR API or a local self-hosted gateway (https://localhost:<port>/v1/api)');
+    err.code = 'MISSING_CREDENTIAL';
+    err.status = 400;
+    throw err;
   }
 
   async validateCredentials() {

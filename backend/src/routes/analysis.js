@@ -3,6 +3,7 @@ const { body, param, query, validationResult } = require('express-validator');
 const { getHistoricalData } = require('../services/marketData');
 const { calculateAll } = require('../services/indicators');
 const { generateSignal } = require('../services/aiAnalysis');
+const { getNews } = require('../services/alpacaMarketData');
 const { db } = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -30,7 +31,8 @@ router.post('/generate', authenticate, [
   }
 
   const indicators = calculateAll(histData.candles);
-  const signal = await generateSignal(req.user.id, symbol, timeframe, histData, indicators);
+  const news = await getNews([symbol], 5);
+  const signal = await generateSignal(req.user.id, symbol, timeframe, histData, indicators, news);
 
   res.json({ signal });
 }));

@@ -104,6 +104,16 @@ export interface PortfolioSummary {
   }
 }
 
+export interface NewsItem {
+  id?: string | number
+  headline: string
+  summary?: string
+  source?: string
+  url?: string
+  symbols?: string[]
+  created_at?: string
+}
+
 export interface Signal {
   id: string
   symbol: string
@@ -120,6 +130,16 @@ export interface Signal {
   actual_result?: string
   expires_at?: string
   created_at?: string
+  indicators?: { news?: NewsItem[]; [key: string]: unknown }
+}
+
+export interface LiveQuote {
+  symbol: string
+  source: 'alpaca' | 'yahoo'
+  price: number | null
+  bid?: number | null
+  ask?: number | null
+  timestamp?: string
 }
 
 export interface SignalPerformance {

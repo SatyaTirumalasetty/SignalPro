@@ -2,10 +2,10 @@
   "name": "signalpro-backend",
   "version": "1.0.0",
   "description": "SignalPro Enterprise - Secure AI Trading Platform Backend",
-  "main": "src/server.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js --ignore logs/",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js --ignore logs/",
     "migrate": "node src/database/migrate.js",
     "seed": "node src/database/seed.js",
     "test": "jest --coverage",
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
+    "@aws-sdk/client-secrets-manager": "^3.1068.0",
     "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

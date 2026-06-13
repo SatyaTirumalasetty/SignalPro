@@ -14,7 +14,7 @@ function getClient() {
 
 const SYSTEM_PROMPT = `You are an expert financial analyst and algorithmic trader with deep knowledge of technical analysis, market microstructure, and risk management.
 
-Analyze the provided market data and technical indicators to generate a precise trading signal.
+Analyze the provided market data, technical indicators, and recent news headlines to generate a precise trading signal.
 
 Respond ONLY with valid JSON (no markdown, no backticks) matching this exact structure:
 {
@@ -37,11 +37,15 @@ Rules:
 - Stop-loss must be set for buy/sell signals
 - Base all analysis strictly on the provided data`;
 
-function buildPrompt(symbol, timeframe, priceData, indicators) {
+function buildPrompt(symbol, timeframe, priceData, indicators, news = []) {
   const { current_price, previous_close, candles } = priceData;
   const recent = candles.slice(-5).map(c =>
     `  ${c.time.slice(0,16)} O:${c.open?.toFixed(2)} H:${c.high?.toFixed(2)} L:${c.low?.toFixed(2)} C:${c.close?.toFixed(2)} V:${c.volume?.toLocaleString()}`
   ).join('\n');
+
+  const newsSection = news.length
+    ? `\n\n## Recent News Headlines\n${news.map(n => `- "${n.headline}" (${n.source}, ${n.created_at?.slice(0, 10)})`).join('\n')}`
+    : '\n\n## Recent News Headlines\nNone available.';
 
   return `Analyze ${symbol} on the ${timeframe} timeframe and generate a trading signal.
 
@@ -62,10 +66,10 @@ ${recent}
 - Bollinger Bands: Upper ${indicators.bollinger_bands?.upper?.toFixed(2) ?? 'N/A'} | Mid ${indicators.bollinger_bands?.middle?.toFixed(2) ?? 'N/A'} | Lower ${indicators.bollinger_bands?.lower?.toFixed(2) ?? 'N/A'}
 - VWAP: ${indicators.vwap ?? 'N/A'}
 - Stochastic %K: ${indicators.stochastic?.k?.toFixed(1) ?? 'N/A'}  %D: ${indicators.stochastic?.d?.toFixed(1) ?? 'N/A'}
-- ATR(14): ${indicators.atr_14 ?? 'N/A'}`;
+- ATR(14): ${indicators.atr_14 ?? 'N/A'}${newsSection}`;
 }
 
-async function generateSignal(userId, symbol, timeframe, priceData, indicators) {
+async function generateSignal(userId, symbol, timeframe, priceData, indicators, news = []) {
   // Check cache first — don't re-analyze same symbol+timeframe within 5 minutes
   const cacheKey = `signal:${symbol}:${timeframe}`;
   const cached = await cacheGet(cacheKey);
@@ -79,7 +83,7 @@ async function generateSignal(userId, symbol, timeframe, priceData, indicators) 
     throw Object.assign(new Error('AI analysis not configured (ANTHROPIC_API_KEY missing)'), { status: 503 });
   }
 
-  const prompt = buildPrompt(symbol, timeframe, priceData, indicators);
+  const prompt = buildPrompt(symbol, timeframe, priceData, indicators, news);
 
   let message;
   try {
@@ -109,6 +113,10 @@ async function generateSignal(userId, symbol, timeframe, priceData, indicators) 
     throw Object.assign(new Error('AI returned invalid signal type'), { status: 502 });
   }
 
+  // Fold news headlines into the persisted indicators blob so they ride along
+  // with the cached/stored signal without requiring a schema change.
+  const indicatorsWithNews = news.length ? { ...indicators, news } : indicators;
+
   const signalData = {
     user_id: userId,
     symbol,
@@ -125,7 +133,7 @@ async function generateSignal(userId, symbol, timeframe, priceData, indicators) 
     key_levels: parsed.key_levels || {},
     timeframe_bias: parsed.timeframe_bias,
     catalysts: parsed.catalysts || [],
-    indicators,
+    indicators: indicatorsWithNews,
     ai_model: MODEL,
     ai_tokens_used: tokensUsed,
     cached: false,
@@ -145,7 +153,7 @@ async function generateSignal(userId, symbol, timeframe, priceData, indicators) 
       [
         userId, symbol, timeframe, parsed.signal, signalData.confidence, parsed.reasoning,
         MODEL, tokensUsed, priceData.current_price, parsed.stop_loss, parsed.take_profit,
-        parsed.predicted_high, parsed.predicted_low, JSON.stringify(indicators),
+        parsed.predicted_high, parsed.predicted_low, JSON.stringify(indicatorsWithNews),
       ]
     );
     signalData.id = row.id;

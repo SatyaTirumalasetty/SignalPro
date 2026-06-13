@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { cacheGet, cacheSet } = require('../config/redis');
+const alpacaMarketData = require('./alpacaMarketData');
 
 const YF_BASE = 'https://query1.finance.yahoo.com';
 const YF_BASE2 = 'https://query2.finance.yahoo.com';
@@ -106,6 +107,25 @@ async function getCurrentPrice(symbol) {
   return priceData;
 }
 
+// Live bid/ask/last-trade quote, sourced from Alpaca when configured (sub-second
+// freshness) with a fall back to the Yahoo-derived snapshot otherwise.
+async function getLiveQuote(symbol) {
+  if (alpacaMarketData.isConfigured()) {
+    const quotes = await alpacaMarketData.getLatestQuotes([symbol]);
+    if (quotes[symbol]) return { symbol, source: 'alpaca', ...quotes[symbol] };
+  }
+
+  const price = await getCurrentPrice(symbol);
+  return {
+    symbol,
+    source: 'yahoo',
+    price: price.price,
+    bid: null,
+    ask: null,
+    timestamp: price.timestamp,
+  };
+}
+
 async function getHistoricalData(symbol, interval = '1h', bars = 200) {
   const cacheKey = `hist:${symbol}:${interval}:${bars}`;
   const cached = await cacheGet(cacheKey);
@@ -143,4 +163,4 @@ async function searchSymbols(query) {
   return results;
 }
 
-module.exports = { getCurrentPrice, getHistoricalData, searchSymbols };
+module.exports = { getCurrentPrice, getLiveQuote, getHistoricalData, searchSymbols };

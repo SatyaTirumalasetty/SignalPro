@@ -156,6 +156,28 @@ function SignalDetailDialog({ signal, onClose }: { signal: Signal | null; onClos
               <p className="whitespace-pre-wrap text-foreground">{signal.analysis_text}</p>
             </div>
           )}
+          {!!signal.indicators?.news?.length && (
+            <div>
+              <div className="mb-1 text-xs uppercase text-muted">News considered</div>
+              <ul className="flex flex-col gap-2">
+                {signal.indicators.news.map((item, i) => (
+                  <li key={item.id ?? i} className="rounded-md border border-border p-2">
+                    {item.url ? (
+                      <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">
+                        {item.headline}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-foreground">{item.headline}</span>
+                    )}
+                    <div className="text-xs text-muted">
+                      {item.source}
+                      {item.created_at ? ` · ${formatDate(item.created_at)}` : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </Dialog>

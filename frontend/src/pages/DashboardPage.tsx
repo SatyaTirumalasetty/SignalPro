@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useLivePrices } from '@/hooks/useWebSocket'
 import type { Order, PortfolioSummary, Signal } from '@/types/api'
 import { signalBadgeVariant, formatCurrency, formatPercent } from '@/lib/format'
 
@@ -27,6 +28,8 @@ export function DashboardPage() {
   })
 
   const summary = portfolio.data?.summary
+  const watchedSymbols = portfolio.data?.positions.map((p) => p.symbol) ?? []
+  const livePrices = useLivePrices(watchedSymbols)
 
   return (
     <div className="flex flex-col gap-6">
@@ -77,6 +80,32 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {!!watchedSymbols.length && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Live prices</CardTitle>
+            <Badge variant="muted">Live</Badge>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {watchedSymbols.map((symbol) => {
+              const quote = livePrices[symbol]
+              const change = quote?.change_percent
+              return (
+                <div key={symbol} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">{symbol}</span>
+                  <span className="text-foreground">{quote?.price ? formatCurrency(quote.price) : 'Waiting…'}</span>
+                  {change !== undefined && (
+                    <span className={Number(change) >= 0 ? 'text-success' : 'text-danger'}>
+                      {formatPercent(change)}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>

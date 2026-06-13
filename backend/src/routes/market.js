@@ -1,6 +1,6 @@
 const express = require('express');
 const { query, param, validationResult } = require('express-validator');
-const { getCurrentPrice, getHistoricalData, searchSymbols } = require('../services/marketData');
+const { getCurrentPrice, getLiveQuote, getHistoricalData, searchSymbols } = require('../services/marketData');
 const { calculateAll } = require('../services/indicators');
 const { optionalAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -27,6 +27,16 @@ router.get('/price/:symbol', optionalAuth, [
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   const data = await getCurrentPrice(req.params.symbol.toUpperCase());
   res.json({ price: data });
+}));
+
+// GET /api/market/quote/:symbol — live bid/ask/last trade (Alpaca, falls back to Yahoo)
+router.get('/quote/:symbol', optionalAuth, [
+  param('symbol').trim().notEmpty().isLength({ max: 20 }).toUpperCase(),
+], asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  const quote = await getLiveQuote(req.params.symbol.toUpperCase());
+  res.json({ quote });
 }));
 
 // GET /api/market/history/:symbol?interval=1h&bars=200

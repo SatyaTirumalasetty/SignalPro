@@ -11,6 +11,7 @@ const { helmetOptions } = require('./config/security');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
+const alpacaMarketData = require('./services/alpacaMarketData');
 const logger = require('./config/logger');
 
 // Routes (will create these)
@@ -128,6 +129,30 @@ function broadcastPriceUpdate(symbol, priceData) {
     }
   });
 }
+
+// Poll Alpaca for live quotes on all actively-subscribed symbols and broadcast
+const LIVE_PRICE_POLL_MS = parseInt(process.env.LIVE_PRICE_POLL_MS) || 5000;
+
+setInterval(async () => {
+  if (!alpacaMarketData.isConfigured()) return;
+
+  const symbols = new Set();
+  wss.clients.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.subscriptions.forEach((s) => symbols.add(s));
+    }
+  });
+  if (symbols.size === 0) return;
+
+  try {
+    const quotes = await alpacaMarketData.getLatestQuotes([...symbols]);
+    for (const [symbol, quote] of Object.entries(quotes)) {
+      broadcastPriceUpdate(symbol, quote);
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Live price poll failed');
+  }
+}, LIVE_PRICE_POLL_MS);
 
 module.exports = { app, server, wss, broadcastPriceUpdate };
 

@@ -167,9 +167,10 @@ jobs:
     # known vulnerabilities and license-policy violations. Verify the action
     # name/version against your Black Duck tenant's current integration docs —
     # Synopsys/Black Duck has rebranded its scanning tooling more than once.
-    # Skipped until a Black Duck Hub instance + token are available (enterprise
-    # product, no self-serve free tier) — remove this `if` once configured.
-    if: ${{ secrets.BLACKDUCK_API_TOKEN != '' }}
+    # Soft-fail until a Black Duck Hub instance + token are available
+    # (enterprise product, no self-serve free tier) — remove this once
+    # BLACKDUCK_URL/BLACKDUCK_API_TOKEN secrets are configured.
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4

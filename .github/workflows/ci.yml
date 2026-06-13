@@ -171,10 +171,11 @@ jobs:
       # trading platform, treat any fixable CRITICAL/HIGH vulnerability as
       # a release blocker — no continue-on-error/soft-fail.
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.32.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           exit-code: '1'
+          version: 'v0.70.0'

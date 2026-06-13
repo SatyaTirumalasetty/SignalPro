@@ -141,6 +141,36 @@ describe('ZerodhaAdapter', () => {
   });
 });
 
+// ── Interactive Brokers Adapter ───────────────────────────────────────────────
+
+describe('InteractiveBrokersAdapter', () => {
+  const InteractiveBrokersAdapter = require('../../services/brokers/adapters/interactiveBrokers');
+
+  test('defaults to the IBKR cloud gateway when gateway_url is not provided', () => {
+    const adapter = new InteractiveBrokersAdapter({ access_token: 'tok', account_id: 'U123' });
+    expect(adapter.accountId).toBe('U123');
+    expect(axios.create).toHaveBeenCalledWith(expect.objectContaining({ baseURL: 'https://api.ibkr.com/v1/api' }));
+  });
+
+  test('accepts a local self-hosted gateway URL', () => {
+    new InteractiveBrokersAdapter({ access_token: 'tok', account_id: 'U123', gateway_url: 'https://localhost:5000/v1/api' });
+    expect(axios.create).toHaveBeenCalledWith(expect.objectContaining({ baseURL: 'https://localhost:5000/v1/api' }));
+  });
+
+  test('rejects an arbitrary gateway_url (SSRF prevention)', () => {
+    expect(() => new InteractiveBrokersAdapter({
+      access_token: 'tok', account_id: 'U123', gateway_url: 'https://evil.example.com/v1/api',
+    })).toThrow(/Invalid gateway_url/);
+  });
+
+  test('validateCredentials returns valid when authenticated', async () => {
+    mockAxios.get.mockResolvedValueOnce({ data: { authenticated: true } });
+    const adapter = new InteractiveBrokersAdapter({ access_token: 'tok', account_id: 'U123' });
+    const result = await adapter.validateCredentials();
+    expect(result.valid).toBe(true);
+  });
+});
+
 // ── Coinbase Adapter ──────────────────────────────────────────────────────────
 
 describe('CoinbaseAdapter', () => {

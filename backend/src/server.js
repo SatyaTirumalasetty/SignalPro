@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const WebSocket = require('ws');
 
 const { initializeDatabase } = require('./config/database');
+const { helmetOptions } = require('./config/security');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
@@ -30,16 +31,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // ─── Security & Middleware ────────────────────────────────────
-// JSON-only API: lock down CSP entirely since no HTML/scripts are served here.
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'none'"],
-      frameAncestors: ["'none'"],
-    },
-  },
-  hsts: { maxAge: 31536000, includeSubDomains: true },
-}));
+app.use(helmet(helmetOptions));
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',

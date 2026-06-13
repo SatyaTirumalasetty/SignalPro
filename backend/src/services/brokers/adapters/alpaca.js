@@ -87,6 +87,45 @@ class AlpacaAdapter extends BaseAdapter {
       placed_at: o.created_at,
     }));
   }
+
+  async placeOrder({ symbol, side, order_type = 'market', quantity, price, stop_loss, take_profit }) {
+    const body = {
+      symbol,
+      qty: String(quantity),
+      side,
+      type: order_type,
+      time_in_force: 'day',
+    };
+
+    if (order_type === 'limit' && price) body.limit_price = String(price);
+    if (order_type === 'stop' && price) body.stop_price = String(price);
+
+    if (stop_loss || take_profit) {
+      body.order_class = 'bracket';
+      if (take_profit) body.take_profit = { limit_price: String(take_profit) };
+      if (stop_loss) body.stop_loss = { stop_price: String(stop_loss) };
+    }
+
+    try {
+      const { data } = await this.http.post('/v2/orders', body);
+      return {
+        order_id: data.id,
+        status: mapStatus(data.status),
+        message: `Alpaca order ${data.id} ${data.status}`,
+      };
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
+  }
+
+  async cancelOrder(brokerOrderId) {
+    try {
+      await this.http.delete(`/v2/orders/${brokerOrderId}`);
+      return true;
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
+  }
 }
 
 function mapStatus(s) {

@@ -24,6 +24,18 @@ class BaseAdapter {
     throw new Error(`${this.brokerId}: getOrders not implemented`);
   }
 
+  // Places an order with the broker.
+  // Args: { symbol, side, order_type, quantity, price, stop_loss, take_profit }
+  // Returns { order_id, status, message }
+  async placeOrder(_order) {
+    throw new Error(`${this.brokerId}: placeOrder not implemented`);
+  }
+
+  // Cancels an open order by broker order ID. Returns true on success.
+  async cancelOrder(_brokerOrderId) {
+    throw new Error(`${this.brokerId}: cancelOrder not implemented`);
+  }
+
   // Returns updated credentials object if tokens were refreshed, else null
   async refreshToken() {
     return null;

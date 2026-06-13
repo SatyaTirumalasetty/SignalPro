@@ -59,6 +59,16 @@ describe('BaseAdapter', () => {
     const adapter = new BaseAdapter('test', {});
     await expect(adapter.validateCredentials()).rejects.toThrow();
   });
+
+  test('base placeOrder throws NotImplemented', async () => {
+    const adapter = new BaseAdapter('test', {});
+    await expect(adapter.placeOrder({})).rejects.toThrow(/placeOrder not implemented/);
+  });
+
+  test('base cancelOrder throws NotImplemented', async () => {
+    const adapter = new BaseAdapter('test', {});
+    await expect(adapter.cancelOrder('order-1')).rejects.toThrow(/cancelOrder not implemented/);
+  });
 });
 
 // ── Alpaca Adapter ────────────────────────────────────────────────────────────
@@ -111,6 +121,65 @@ describe('AlpacaAdapter', () => {
     const adapter = new AlpacaAdapter(creds);
     const result = await adapter.getOrders(10);
     expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('placeOrder sends a plain market order', async () => {
+    mockAxios.post.mockResolvedValueOnce({ data: { id: 'order-1', status: 'accepted' } });
+    const adapter = new AlpacaAdapter(creds);
+    const result = await adapter.placeOrder({ symbol: 'AAPL', side: 'buy', order_type: 'market', quantity: 10 });
+    expect(mockAxios.post).toHaveBeenCalledWith('/v2/orders', expect.objectContaining({
+      symbol: 'AAPL', qty: '10', side: 'buy', type: 'market', time_in_force: 'day',
+    }));
+    expect(result.order_id).toBe('order-1');
+    expect(result.status).toBe('pending');
+  });
+
+  test('placeOrder sends a limit order with limit_price', async () => {
+    mockAxios.post.mockResolvedValueOnce({ data: { id: 'order-2', status: 'accepted' } });
+    const adapter = new AlpacaAdapter(creds);
+    await adapter.placeOrder({ symbol: 'AAPL', side: 'buy', order_type: 'limit', quantity: 5, price: 150 });
+    expect(mockAxios.post).toHaveBeenCalledWith('/v2/orders', expect.objectContaining({
+      type: 'limit', limit_price: '150',
+    }));
+  });
+
+  test('placeOrder sends a bracket order with stop_loss and take_profit', async () => {
+    mockAxios.post.mockResolvedValueOnce({ data: { id: 'order-3', status: 'accepted' } });
+    const adapter = new AlpacaAdapter(creds);
+    await adapter.placeOrder({
+      symbol: 'AAPL', side: 'buy', order_type: 'market', quantity: 10,
+      stop_loss: 140, take_profit: 170,
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith('/v2/orders', expect.objectContaining({
+      order_class: 'bracket',
+      stop_loss: { stop_price: '140' },
+      take_profit: { limit_price: '170' },
+    }));
+  });
+
+  test('placeOrder throws apiError on broker rejection', async () => {
+    const err = new Error('Forbidden');
+    err.response = { status: 403, data: { message: 'insufficient buying power' } };
+    mockAxios.post.mockRejectedValueOnce(err);
+    const adapter = new AlpacaAdapter(creds);
+    await expect(adapter.placeOrder({ symbol: 'AAPL', side: 'buy', order_type: 'market', quantity: 10 }))
+      .rejects.toThrow(/insufficient buying power/);
+  });
+
+  test('cancelOrder returns true on success', async () => {
+    mockAxios.delete = jest.fn().mockResolvedValueOnce({});
+    const adapter = new AlpacaAdapter(creds);
+    const result = await adapter.cancelOrder('order-1');
+    expect(result).toBe(true);
+    expect(mockAxios.delete).toHaveBeenCalledWith('/v2/orders/order-1');
+  });
+
+  test('cancelOrder throws apiError on failure', async () => {
+    const err = new Error('Not Found');
+    err.response = { status: 404, data: { message: 'order not found' } };
+    mockAxios.delete = jest.fn().mockRejectedValueOnce(err);
+    const adapter = new AlpacaAdapter(creds);
+    await expect(adapter.cancelOrder('order-x')).rejects.toThrow(/order not found/);
   });
 });
 

@@ -25,6 +25,7 @@ const analysisRoutes = require('./routes/analysis');
 const billingRoutes = require('./routes/billing');
 const subscriptionRoutes = require('./routes/subscriptions');
 const adminRoutes = require('./routes/admin');
+const backtestRoutes = require('./routes/backtest');
 
 const app = express();
 const server = http.createServer(app);
@@ -75,6 +76,7 @@ app.use('/api/analysis', analysisRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/backtest', backtestRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((req, res) => {

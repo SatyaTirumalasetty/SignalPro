@@ -196,6 +196,8 @@ CREATE TABLE orders (
   status order_status DEFAULT 'pending',
   filled_quantity DECIMAL(20, 8) DEFAULT 0,
   average_price DECIMAL(20, 8),
+  stop_loss DECIMAL(20, 8),
+  take_profit DECIMAL(20, 8),
   signal_id UUID,
   created_by_ai BOOLEAN DEFAULT FALSE,
   ai_confidence DECIMAL(5, 2),

@@ -5,6 +5,7 @@ const { db } = require('../config/database');
 const { decryptCredentials } = require('../config/brokerEncryption');
 const { getAdapter } = require('../services/brokers/index');
 const { getCurrentPrice } = require('../services/marketData');
+const riskManagement = require('../services/riskManagement');
 const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
@@ -28,7 +29,7 @@ router.post('/orders', authenticate, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { broker_connection_id, symbol, side, order_type = 'market', quantity, price, signal_id } = req.body;
+  const { broker_connection_id, symbol, side, order_type = 'market', quantity, price, stop_loss, take_profit, signal_id } = req.body;
 
   // Verify connection ownership
   const conn = await db.oneOrNone(
@@ -47,32 +48,59 @@ router.post('/orders', authenticate, [
     } catch { /* non-fatal — proceed without price */ }
   }
 
+  // Risk checks: daily loss circuit breaker + stop-loss-based position sizing.
+  // Best-effort — only an explicit RISK_LIMIT_EXCEEDED blocks the order.
+  let finalQuantity = quantity;
+  try {
+    const credentials = decryptCredentials(conn.credentials_encrypted);
+    const adapter = getAdapter(conn.broker_id, credentials);
+    const account = await adapter.getAccountInfo();
+    const equity = account?.funds?.equity;
+
+    await riskManagement.checkDailyLossLimit({ db, userId: req.user.id, equity });
+
+    if (stop_loss && currentPrice) {
+      const sizedQty = riskManagement.calculatePositionSize({
+        equity, entryPrice: currentPrice, stopLoss: stop_loss,
+      });
+      if (sizedQty > 0 && sizedQty < finalQuantity) {
+        logger.warn({ userId: req.user.id, symbol, requested: finalQuantity, capped: sizedQty }, 'Order quantity capped by risk management');
+        finalQuantity = sizedQty;
+      }
+    }
+  } catch (err) {
+    if (err.code === 'RISK_LIMIT_EXCEEDED') {
+      return res.status(403).json({ error: err.message });
+    }
+    logger.warn({ userId: req.user.id, err: err.message }, 'Risk management check failed — proceeding without sizing');
+  }
+
   // Create order record first (status: pending)
   const orderId = uuidv4();
   await db.none(
     `INSERT INTO orders (id, user_id, broker_connection_id, symbol, order_type, side,
-                         quantity, price, status, signal_id, created_by_ai, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+                         quantity, price, stop_loss, take_profit, status, signal_id, created_by_ai, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
     [orderId, req.user.id, broker_connection_id, symbol, order_type, side,
-     quantity, currentPrice, signal_id || null, !!signal_id]
+     finalQuantity, currentPrice, stop_loss || null, take_profit || null, signal_id || null, !!signal_id]
   );
 
   // Submit to broker asynchronously
-  executeOrderAsync(orderId, req.user.id, conn, symbol, side, order_type, quantity, currentPrice);
+  executeOrderAsync(orderId, req.user.id, conn, symbol, side, order_type, finalQuantity, currentPrice, stop_loss, take_profit);
 
   res.status(201).json({
-    order: { id: orderId, symbol, side, order_type, quantity, price: currentPrice, status: 'pending' },
+    order: { id: orderId, symbol, side, order_type, quantity: finalQuantity, price: currentPrice, stop_loss: stop_loss || null, take_profit: take_profit || null, status: 'pending' },
     message: 'Order submitted',
   });
 }));
 
-async function executeOrderAsync(orderId, userId, conn, symbol, side, orderType, quantity, price) {
+async function executeOrderAsync(orderId, userId, conn, symbol, side, orderType, quantity, price, stopLoss, takeProfit) {
   try {
     const credentials = decryptCredentials(conn.credentials_encrypted);
     const adapter = getAdapter(conn.broker_id, credentials);
 
     const result = await adapter.placeOrder?.({
-      symbol, side, order_type: orderType, quantity, price,
+      symbol, side, order_type: orderType, quantity, price, stop_loss: stopLoss, take_profit: takeProfit,
     });
 
     await db.none(

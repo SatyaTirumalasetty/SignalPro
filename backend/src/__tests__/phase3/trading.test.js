@@ -48,7 +48,11 @@ const MOCK_POSITION = {
   credentials_encrypted: 'enc:tag:data',
 };
 
-const mockAdapter = { placeOrder: jest.fn().mockResolvedValue({ order_id: 'broker-order-1' }), cancelOrder: jest.fn().mockResolvedValue(true) };
+const mockAdapter = {
+  placeOrder: jest.fn().mockResolvedValue({ order_id: 'broker-order-1' }),
+  cancelOrder: jest.fn().mockResolvedValue(true),
+  getAccountInfo: jest.fn().mockResolvedValue({ funds: { equity: 100000 } }),
+};
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -56,6 +60,10 @@ beforeEach(() => {
   mockDecryptCredentials.mockReturnValue({ api_key: 'key', secret: 'secret' });
   mockGetAdapter.mockReturnValue(mockAdapter);
   mockGetCurrentPrice.mockResolvedValue({ price: 150 });
+  mockAdapter.getAccountInfo.mockResolvedValue({ funds: { equity: 100000 } });
+  mockAdapter.placeOrder.mockResolvedValue({ order_id: 'broker-order-1' });
+  mockAdapter.cancelOrder.mockResolvedValue(true);
+  mockDb.one.mockResolvedValue({ realized_pnl: '0', count: '0' });
 });
 
 const app = createApp();
@@ -105,6 +113,41 @@ describe('POST /api/trading/orders', () => {
       .set('Authorization', auth)
       .send({ broker_connection_id: CONN_ID, symbol: 'AAPL', side: 'buy', quantity: 5, signal_id: '550e8400-e29b-41d4-a716-446655440000' });
     expect(res.status).toBe(201);
+  });
+
+  test('passes through stop_loss and take_profit', async () => {
+    mockDb.oneOrNone.mockResolvedValueOnce(MOCK_CONN);
+    const res = await request(app)
+      .post('/api/trading/orders')
+      .set('Authorization', auth)
+      .send({ broker_connection_id: CONN_ID, symbol: 'AAPL', side: 'buy', quantity: 10, stop_loss: 140, take_profit: 170 });
+    expect(res.status).toBe(201);
+    expect(res.body.order.stop_loss).toBe(140);
+    expect(res.body.order.take_profit).toBe(170);
+  });
+
+  test('caps quantity based on stop_loss-derived position sizing', async () => {
+    mockDb.oneOrNone.mockResolvedValueOnce(MOCK_CONN);
+    mockGetCurrentPrice.mockResolvedValueOnce({ price: 150 });
+    // equity=100000, entry=150, stop=140 -> risk-based qty = (100000*0.01)/10 = 100, less than requested 500
+    const res = await request(app)
+      .post('/api/trading/orders')
+      .set('Authorization', auth)
+      .send({ broker_connection_id: CONN_ID, symbol: 'AAPL', side: 'buy', quantity: 500, stop_loss: 140 });
+    expect(res.status).toBe(201);
+    expect(res.body.order.quantity).toBe(100);
+  });
+
+  test('returns 403 when daily loss limit has been reached', async () => {
+    mockDb.oneOrNone.mockResolvedValueOnce(MOCK_CONN);
+    // -3% of 100000 = -3000, matches the default daily loss limit
+    mockDb.one.mockResolvedValueOnce({ realized_pnl: '-3000' });
+    const res = await request(app)
+      .post('/api/trading/orders')
+      .set('Authorization', auth)
+      .send({ broker_connection_id: CONN_ID, symbol: 'AAPL', side: 'buy', quantity: 10 });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/daily loss limit/i);
   });
 });
 

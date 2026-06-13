@@ -158,44 +158,23 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONARTOKEN }}
         # No continue-on-error / soft-fail: a red quality gate must block merge.
 
-  blackduck:
-    name: Black Duck SCA Scan
+  dependency-scan:
+    name: Trivy Dependency Scan
     runs-on: ubuntu-latest
     needs: test
-    # Requires repo secrets BLACKDUCK_URL and BLACKDUCK_API_TOKEN pointing at
-    # your Black Duck Hub. Scans both backend and frontend dependency trees for
-    # known vulnerabilities and license-policy violations. Verify the action
-    # name/version against your Black Duck tenant's current integration docs —
-    # Synopsys/Black Duck has rebranded its scanning tooling more than once.
-    # Soft-fail until a Black Duck Hub instance + token are available
-    # (enterprise product, no self-serve free tier) — remove this once
-    # BLACKDUCK_URL/BLACKDUCK_API_TOKEN secrets are configured.
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      # Free, self-serve SCA scan of backend + frontend dependency trees
+      # (package-lock.json) for known vulnerabilities. For a financial
+      # trading platform, treat any fixable CRITICAL/HIGH vulnerability as
+      # a release blocker — no continue-on-error/soft-fail.
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
         with:
-          node-version: '20'
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Black Duck Full Scan
-        uses: blackduck-inc/black-duck-security-scan@v2
-        env:
-          BLACKDUCK_URL: ${{ secrets.BLACKDUCK_URL }}
-          BLACKDUCK_API_TOKEN: ${{ secrets.BLACKDUCK_API_TOKEN }}
-        with:
-          blackducksca_scan_full: true
-          # Block the build on policy violations of these severities — for a
-          # financial trading platform, treat any known-vulnerable or
-          # disallowed-license dependency as a release blocker.
-          blackducksca_scan_failure_severities: 'BLOCKER,CRITICAL,HIGH'
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '1'

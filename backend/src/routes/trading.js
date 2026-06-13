@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, param, query, validationResult } = require('express-validator');
+const { body, query, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('../config/database');
 const { decryptCredentials } = require('../config/brokerEncryption');
@@ -28,7 +28,7 @@ router.post('/orders', authenticate, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { broker_connection_id, symbol, side, order_type = 'market', quantity, price, stop_loss, take_profit, signal_id } = req.body;
+  const { broker_connection_id, symbol, side, order_type = 'market', quantity, price, signal_id } = req.body;
 
   // Verify connection ownership
   const conn = await db.oneOrNone(

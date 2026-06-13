@@ -1,6 +1,6 @@
 const logger = require('../config/logger');
 
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   const status = err.status || err.statusCode || 500;
   const isDev = process.env.NODE_ENV !== 'production';
 

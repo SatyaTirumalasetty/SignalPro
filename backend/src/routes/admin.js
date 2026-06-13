@@ -1,6 +1,5 @@
 const express = require('express');
-const { body, query, param, validationResult } = require('express-validator');
-const bcrypt = require('bcryptjs');
+const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');

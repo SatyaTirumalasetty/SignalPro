@@ -138,7 +138,7 @@ async function handleStripeWebhook(rawBody, signature) {
   switch (event.type) {
     case 'payment_intent.succeeded': {
       const pi = event.data.object;
-      const { user_id, plan_id, billing_cycle } = pi.metadata;
+      const { user_id, plan_id } = pi.metadata;
       if (user_id && plan_id) {
         await db.none(
           `INSERT INTO payments (user_id, amount, currency, status, payment_method, transaction_id, gateway_response, completed_at)

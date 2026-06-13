@@ -26,7 +26,7 @@ const { generateAccessToken } = require('../../middleware/auth');
 const app = express();
 app.use(express.json());
 app.use('/api/api-keys', apiKeysRouter);
-app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
 
 const testUser = { id: 'user-uuid-1', email: 'test@signalpro.com', role: 'user', status: 'active' };
 let authHeader;

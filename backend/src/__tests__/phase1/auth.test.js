@@ -36,7 +36,7 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../../service
 const app = express();
 app.use(express.json());
 app.use('/api/auth', authRouter);
-app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
 
 const TEST_PASSWORD = 'Password123!';
 const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);
@@ -253,9 +253,7 @@ describe('POST /api/auth/forgot-password', () => {
 
 describe('POST /api/auth/reset-password', () => {
   test('200: valid token resets password', async () => {
-    const crypto = require('crypto');
     const rawToken = 'valid-reset-token-32bytes-padding!!';
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     mockDb.oneOrNone.mockResolvedValueOnce({ id: 'prt-1', user_id: testUser.id });
 
     const res = await request(app).post('/api/auth/reset-password')

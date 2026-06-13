@@ -1,6 +1,5 @@
 const axios = require('axios');
 const { cacheGet, cacheSet } = require('../config/redis');
-const logger = require('../config/logger');
 
 const YF_BASE = 'https://query1.finance.yahoo.com';
 const YF_BASE2 = 'https://query2.finance.yahoo.com';

@@ -36,7 +36,7 @@ const { encryptCredentials } = require('../../config/brokerEncryption');
 const app = express();
 app.use(express.json());
 app.use('/api/brokers', brokersRouter);
-app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
 
 const testUser = { id: 'user-uuid-1', email: 'test@signalpro.com', role: 'user', status: 'active' };
 let authHeader;
@@ -76,7 +76,7 @@ describe('GET /api/brokers/supported', () => {
 
 describe('GET /api/brokers/connections', () => {
   test('200: returns user connections without credentials', async () => {
-    const { credentials_encrypted, ...safeConn } = alpacaConnection;
+    const { credentials_encrypted: _credentials_encrypted, ...safeConn } = alpacaConnection;
     mockDb.manyOrNone.mockResolvedValueOnce([safeConn]);
 
     const res = await request(app).get('/api/brokers/connections').set('Authorization', authHeader);

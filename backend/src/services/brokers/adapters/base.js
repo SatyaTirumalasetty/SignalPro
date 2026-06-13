@@ -20,7 +20,7 @@ class BaseAdapter {
   }
 
   // Returns array of order objects
-  async getOrders(limit = 50) {
+  async getOrders(_limit = 50) {
     throw new Error(`${this.brokerId}: getOrders not implemented`);
   }
 

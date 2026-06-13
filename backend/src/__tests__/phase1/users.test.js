@@ -23,7 +23,7 @@ const { generateAccessToken } = require('../../middleware/auth');
 const app = express();
 app.use(express.json());
 app.use('/api/users', usersRouter);
-app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
 
 const TEST_PASSWORD = 'Password123!';
 const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);

@@ -87,7 +87,7 @@ function vwap(candles) {
   return cumV ? cumPV / cumV : null;
 }
 
-function stochastic(candles, kPeriod = 14, dPeriod = 3) {
+function stochastic(candles, kPeriod = 14, _dPeriod = 3) {
   if (candles.length < kPeriod) return null;
   const slice = candles.slice(-kPeriod);
   const highMax = Math.max(...slice.map(c => c.high));

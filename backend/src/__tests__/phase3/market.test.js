@@ -21,7 +21,7 @@ function createApp() {
   const app = express();
   app.use(express.json());
   app.use('/api/market', router);
-  app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   return app;
 }
 

@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { db } = require('../config/database');
 const { encryptCredentials, decryptCredentials } = require('../config/brokerEncryption');
-const { getAdapter, getBrokerMeta, listBrokers, isOAuthBroker } = require('../services/brokers/index');
+const { getAdapter, getBrokerMeta, listBrokers } = require('../services/brokers/index');
 const ZerodhaAdapter = require('../services/brokers/adapters/zerodha');
 const SaxoAdapter    = require('../services/brokers/adapters/saxo');
 const { syncConnection } = require('../services/brokerSync');
@@ -122,7 +122,7 @@ router.get('/:brokerId/oauth/url', authenticate, [
 // ── GET /api/brokers/oauth/callback ──────────────────────────────────────────
 
 router.get('/oauth/callback', asyncHandler(async (req, res) => {
-  const { state, request_token, code, broker_id } = req.query;
+  const { state, request_token, code } = req.query;
 
   if (!state) return res.status(400).json({ error: 'Missing state parameter' });
 

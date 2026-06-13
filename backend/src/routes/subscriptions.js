@@ -25,7 +25,6 @@ router.post('/create', authenticate, [
   const { plan_id, billing_cycle, payment_method = 'stripe' } = req.body;
 
   // Check plan exists
-  const plan = await billing.getPlan(null);
   const plans = await billing.getPlans();
   const validPlan = plans.find(p => p.id === plan_id);
   if (!validPlan) return res.status(404).json({ error: 'Pricing plan not found' });

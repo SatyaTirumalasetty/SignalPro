@@ -116,7 +116,7 @@ describe('createSubscription()', () => {
 describe('cancelSubscription()', () => {
   test('immediate cancellation sets status to cancelled', async () => {
     mockDb.one.mockResolvedValueOnce({ ...SUBSCRIPTION, status: 'cancelled' });
-    const sub = await billing.cancelSubscription('sub-uuid', 'user-uuid', true);
+    await billing.cancelSubscription('sub-uuid', 'user-uuid', true);
     expect(mockDb.one).toHaveBeenCalledWith(
       expect.stringContaining("status = 'cancelled'"),
       expect.any(Array),
@@ -125,7 +125,7 @@ describe('cancelSubscription()', () => {
 
   test('end-of-period cancellation sets cancel_at_period_end', async () => {
     mockDb.one.mockResolvedValueOnce({ ...SUBSCRIPTION, cancel_at_period_end: true });
-    const sub = await billing.cancelSubscription('sub-uuid', 'user-uuid', false);
+    await billing.cancelSubscription('sub-uuid', 'user-uuid', false);
     expect(mockDb.one).toHaveBeenCalledWith(
       expect.stringContaining('cancel_at_period_end = TRUE'),
       expect.any(Array),
@@ -136,7 +136,7 @@ describe('cancelSubscription()', () => {
 describe('changePlan()', () => {
   test('updates plan_id for active subscription', async () => {
     mockDb.one.mockResolvedValueOnce({ ...SUBSCRIPTION, plan_id: 'new-plan-uuid' });
-    const sub = await billing.changePlan('sub-uuid', 'user-uuid', 'new-plan-uuid');
+    await billing.changePlan('sub-uuid', 'user-uuid', 'new-plan-uuid');
     expect(mockDb.one).toHaveBeenCalledWith(
       expect.stringContaining("status = 'active'"),
       expect.arrayContaining(['new-plan-uuid']),

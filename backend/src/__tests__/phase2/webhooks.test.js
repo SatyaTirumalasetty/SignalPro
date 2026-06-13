@@ -14,7 +14,7 @@ const mockDb = {
 jest.mock('../../config/database', () => ({ db: mockDb, initializeDatabase: jest.fn() }));
 jest.mock('../../config/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }));
 jest.mock('../../config/brokerEncryption', () => ({
-  encryptCredentials: jest.fn(obj => 'encrypted'),
+  encryptCredentials: jest.fn(_obj => 'encrypted'),
   decryptCredentials: jest.fn(() => ({ api_key: 'k', api_secret: 's' })),
 }));
 
@@ -25,7 +25,7 @@ const webhooksRouter = require('../../routes/webhooks');
 
 const app = express();
 app.use('/api/webhooks', webhooksRouter);
-app.use((err, req, res, next) => res.status(err.status || 500).json({ error: err.message }));
+app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
 
 beforeEach(() => jest.resetAllMocks().mockDb && (mockDb.none.mockResolvedValue(undefined)));
 

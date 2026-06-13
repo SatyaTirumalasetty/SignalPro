@@ -11,7 +11,7 @@ const mockDb = {
 jest.mock('../../config/database', () => ({ db: mockDb, initializeDatabase: jest.fn() }));
 jest.mock('../../config/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 jest.mock('node-cron', () => ({
-  schedule: jest.fn((expr, fn) => ({ start: jest.fn(), stop: jest.fn() })),
+  schedule: jest.fn((_expr, _fn) => ({ start: jest.fn(), stop: jest.fn() })),
 }));
 jest.mock('axios', () => {
   const mockInstance = { get: jest.fn(), post: jest.fn(), interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } } };

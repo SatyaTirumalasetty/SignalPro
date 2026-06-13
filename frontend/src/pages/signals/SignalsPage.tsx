@@ -7,10 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { PlaceOrderDialog } from '@/components/trading/PlaceOrderDialog'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatCurrency, formatDate, formatPercent, signalBadgeVariant } from '@/lib/format'
 import type { Signal } from '@/types/api'
+
+function isExecutable(signal: Signal): boolean {
+  return signal.signal_type === 'buy' || signal.signal_type === 'sell'
+}
 
 export function SignalsPage() {
   const queryClient = useQueryClient()
@@ -19,6 +24,7 @@ export function SignalsPage() {
   const [timeframe, setTimeframe] = useState('1h')
   const [error, setError] = useState<string | null>(null)
   const [activeSignal, setActiveSignal] = useState<Signal | null>(null)
+  const [executeSignal, setExecuteSignal] = useState<Signal | null>(null)
 
   const signalsQuery = useQuery({
     queryKey: ['signals'],
@@ -117,9 +123,16 @@ export function SignalsPage() {
                     <TableCell>{formatCurrency(signal.take_profit)}</TableCell>
                     <TableCell className="text-muted">{formatDate(signal.created_at)}</TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => setActiveSignal(signal)}>
-                        Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setActiveSignal(signal)}>
+                          Details
+                        </Button>
+                        {isExecutable(signal) && (
+                          <Button size="sm" onClick={() => setExecuteSignal(signal)}>
+                            Execute
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -129,12 +142,30 @@ export function SignalsPage() {
         </CardContent>
       </Card>
 
-      <SignalDetailDialog signal={activeSignal} onClose={() => setActiveSignal(null)} />
+      <SignalDetailDialog
+        signal={activeSignal}
+        onClose={() => setActiveSignal(null)}
+        onExecute={(s) => {
+          setActiveSignal(null)
+          setExecuteSignal(s)
+        }}
+      />
+      <PlaceOrderDialog
+        open={!!executeSignal}
+        onClose={() => setExecuteSignal(null)}
+        initialValues={executeSignal ? {
+          symbol: executeSignal.symbol,
+          side: executeSignal.signal_type as 'buy' | 'sell',
+          stopLoss: executeSignal.stop_loss,
+          takeProfit: executeSignal.take_profit,
+          signalId: executeSignal.id,
+        } : undefined}
+      />
     </div>
   )
 }
 
-function SignalDetailDialog({ signal, onClose }: { signal: Signal | null; onClose: () => void }) {
+function SignalDetailDialog({ signal, onClose, onExecute }: { signal: Signal | null; onClose: () => void; onExecute: (signal: Signal) => void }) {
   return (
     <Dialog open={!!signal} onClose={onClose} title={signal ? `${signal.symbol} signal` : ''}>
       {signal && (
@@ -143,6 +174,11 @@ function SignalDetailDialog({ signal, onClose }: { signal: Signal | null; onClos
             <Badge variant={signalBadgeVariant(signal.signal_type)}>{signal.signal_type}</Badge>
             <span className="text-muted">{formatPercent(signal.confidence)} confidence</span>
             <Badge variant="muted">{signal.timeframe}</Badge>
+            {isExecutable(signal) && (
+              <Button size="sm" className="ml-auto" onClick={() => onExecute(signal)}>
+                Execute
+              </Button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Entry" value={formatCurrency(signal.entry_price)} />

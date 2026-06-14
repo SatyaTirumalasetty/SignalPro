@@ -256,6 +256,43 @@ describe('analyzeAndTrade', () => {
 
     expect(mockSendAutoTradingDailyLossLimitEmail).toHaveBeenCalledWith('user@example.com');
   });
+
+  test('logs but does not throw when the order-placed email fails to send', async () => {
+    mockDb.oneOrNone
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockDb.one
+      .mockResolvedValueOnce({ count: '0' })
+      .mockResolvedValueOnce({ realized_pnl: '0' });
+    mockGenerateSignal.mockResolvedValueOnce({
+      id: 'sig-1', signal: 'buy', confidence: 90, reasoning: 'strong setup',
+      entry_price: 150, stop_loss: 140, take_profit: 170,
+    });
+    mockPlaceOrder.mockResolvedValueOnce({ id: 'order-1', status: 'pending' });
+    mockSendAutoTradingOrderEmail.mockRejectedValueOnce(new Error('smtp down'));
+
+    await expect(analyzeAndTrade(USER_ID, SETTINGS, CONN, 'AAPL', '1h', 'user@example.com')).resolves.not.toThrow();
+
+    expect(mockDb.none).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO auto_trading_runs'),
+      expect.arrayContaining(['order_placed', 'sig-1', 'order-1'])
+    );
+  });
+
+  test('logs but does not throw when the daily-loss-limit email fails to send', async () => {
+    mockDb.oneOrNone
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockDb.one
+      .mockResolvedValueOnce({ count: '0' })
+      .mockRejectedValueOnce(Object.assign(new Error('Daily loss limit reached'), { code: 'RISK_LIMIT_EXCEEDED' }));
+    mockGenerateSignal.mockResolvedValueOnce({ id: 'sig-1', signal: 'buy', confidence: 90, reasoning: 'strong', entry_price: 150, stop_loss: 140, take_profit: 170 });
+    mockSendAutoTradingDailyLossLimitEmail.mockRejectedValueOnce(new Error('smtp down'));
+
+    await expect(analyzeAndTrade('user-2', SETTINGS, CONN, 'AAPL', '1h', 'user2@example.com')).resolves.not.toThrow();
+
+    expect(mockSendAutoTradingDailyLossLimitEmail).toHaveBeenCalledWith('user2@example.com');
+  });
 });
 
 describe('runForUser', () => {
@@ -284,6 +321,17 @@ describe('runForUser', () => {
     );
     expect(mockSendAutoTradingDisabledEmail).toHaveBeenCalledWith('user@example.com');
     expect(mockDb.oneOrNone).not.toHaveBeenCalled(); // never reached broker connection lookup
+  });
+
+  test('logs but does not throw when the auto-disabled email fails to send', async () => {
+    mockDb.manyOrNone.mockResolvedValueOnce(
+      Array.from({ length: CIRCUIT_BREAKER_ERROR_THRESHOLD }, () => ({ action: 'error' }))
+    );
+    mockSendAutoTradingDisabledEmail.mockRejectedValueOnce(new Error('smtp down'));
+
+    await expect(runForUser(USER_ID, SETTINGS, 'user@example.com')).resolves.not.toThrow();
+
+    expect(mockSendAutoTradingDisabledEmail).toHaveBeenCalledWith('user@example.com');
   });
 });
 

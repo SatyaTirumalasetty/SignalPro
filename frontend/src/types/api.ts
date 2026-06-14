@@ -34,7 +34,7 @@ export interface Order {
   status: string
   broker_order_id?: string
   executed_at?: string
-  created_at?: string
+  created_at: string
 }
 
 export interface BacktestSummary {

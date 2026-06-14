@@ -13,7 +13,28 @@ const { getNews } = require('./alpacaMarketData');
 const { generateSignal } = require('./aiAnalysis');
 const riskManagement = require('./riskManagement');
 const { placeOrder } = require('./orderExecution');
+const {
+  sendAutoTradingOrderEmail,
+  sendAutoTradingDailyLossLimitEmail,
+  sendAutoTradingDisabledEmail,
+} = require('./emailService');
 const logger = require('../config/logger');
+
+// If a user's last N runs (across all symbols) all errored out, auto-trading is
+// disabled for that user so a persistent failure (e.g. broker outage, bad
+// credentials) doesn't loop forever without anyone noticing.
+const CIRCUIT_BREAKER_ERROR_THRESHOLD = 5;
+
+// In-memory dedupe so the daily-loss-limit email is sent at most once per user
+// per day, regardless of how many symbols/timeframes hit the limit.
+const dailyLossLimitNotified = new Map();
+
+function shouldNotifyDailyLossLimit(userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (dailyLossLimitNotified.get(userId) === today) return false;
+  dailyLossLimitNotified.set(userId, today);
+  return true;
+}
 
 const DEFAULT_SETTINGS = {
   enabled: false,
@@ -40,15 +61,47 @@ async function runAutoTradingCycle() {
   }
 
   const users = await db.manyOrNone(
-    `SELECT id, preferences FROM users WHERE preferences->'auto_trading'->>'enabled' = 'true'`
+    `SELECT id, email, preferences FROM users WHERE preferences->'auto_trading'->>'enabled' = 'true'`
   );
 
   logger.info(`Auto-trading: running cycle for ${users.length} user(s)`);
-  await Promise.allSettled(users.map((u) => runForUser(u.id, getAutoTradingSettings(u.preferences))));
+  await Promise.allSettled(users.map((u) => runForUser(u.id, getAutoTradingSettings(u.preferences), u.email)));
 }
 
-async function runForUser(userId, settings) {
+// Returns true if the user's last CIRCUIT_BREAKER_ERROR_THRESHOLD runs (across
+// all symbols/timeframes) all resulted in an error.
+async function checkCircuitBreaker(userId) {
+  const recent = (await db.manyOrNone(
+    `SELECT action FROM auto_trading_runs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [userId, CIRCUIT_BREAKER_ERROR_THRESHOLD]
+  )) || [];
+  return recent.length === CIRCUIT_BREAKER_ERROR_THRESHOLD && recent.every((r) => r.action === 'error');
+}
+
+async function disableAutoTrading(userId, settings) {
+  const merged = { ...settings, enabled: false };
+  await db.none(
+    `UPDATE users
+     SET preferences = jsonb_set(COALESCE(preferences, '{}'::jsonb), '{auto_trading}', $1::jsonb),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2`,
+    [JSON.stringify(merged), userId]
+  );
+}
+
+async function runForUser(userId, settings, userEmail) {
   if (!settings.broker_connection_id || !settings.symbols?.length) return;
+
+  if (await checkCircuitBreaker(userId)) {
+    await disableAutoTrading(userId, settings);
+    await logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'auto_disabled_errors' });
+    if (userEmail) {
+      await sendAutoTradingDisabledEmail(userEmail).catch((err) =>
+        logger.error({ userId, err: err.message }, 'Failed to send auto-trading disabled email')
+      );
+    }
+    return;
+  }
 
   const conn = await db.oneOrNone(
     `SELECT id, broker_id, credentials_encrypted FROM broker_connections
@@ -60,7 +113,7 @@ async function runForUser(userId, settings) {
   for (const symbol of settings.symbols) {
     for (const timeframe of settings.timeframes) {
       try {
-        await analyzeAndTrade(userId, settings, conn, symbol, timeframe);
+        await analyzeAndTrade(userId, settings, conn, symbol, timeframe, userEmail);
       } catch (err) {
         logger.error({ userId, symbol, timeframe, err: err.message }, 'Auto-trading cycle error');
         await logRun({ userId, symbol, timeframe, action: 'error', errorMessage: err.message });
@@ -71,7 +124,7 @@ async function runForUser(userId, settings) {
 
 // ── Per symbol/timeframe decision ───────────────────────────────────────────────
 
-async function analyzeAndTrade(userId, settings, conn, symbol, timeframe) {
+async function analyzeAndTrade(userId, settings, conn, symbol, timeframe, userEmail) {
   const cooldownRow = await db.oneOrNone(
     `SELECT id FROM auto_trading_runs
      WHERE user_id = $1 AND symbol = $2 AND action = 'order_placed'
@@ -130,6 +183,11 @@ async function analyzeAndTrade(userId, settings, conn, symbol, timeframe) {
     await riskManagement.checkDailyLossLimit({ db, userId, equity, maxDailyLossPct: settings.max_daily_loss_pct });
   } catch (err) {
     if (err.code === 'RISK_LIMIT_EXCEEDED') {
+      if (userEmail && shouldNotifyDailyLossLimit(userId)) {
+        await sendAutoTradingDailyLossLimitEmail(userEmail).catch((emailErr) =>
+          logger.error({ userId, err: emailErr.message }, 'Failed to send daily loss limit email')
+        );
+      }
       return logRun({
         userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
         action: 'skipped_daily_loss_limit', signalId: signal.id, reasoning: signal.reasoning,
@@ -156,6 +214,12 @@ async function analyzeAndTrade(userId, settings, conn, symbol, timeframe) {
     quantity, price: signal.entry_price, stopLoss: signal.stop_loss, takeProfit: signal.take_profit,
     signalId: signal.id, source: 'auto_engine',
   });
+
+  if (userEmail) {
+    await sendAutoTradingOrderEmail(userEmail, { symbol, side: signal.signal, quantity, price: signal.entry_price }).catch((err) =>
+      logger.error({ userId, err: err.message }, 'Failed to send auto-trading order email')
+    );
+  }
 
   return logRun({
     userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
@@ -185,5 +249,5 @@ function startAutoTradingCron() {
 
 module.exports = {
   runAutoTradingCycle, startAutoTradingCron, getAutoTradingSettings, DEFAULT_SETTINGS,
-  runForUser, analyzeAndTrade,
+  runForUser, analyzeAndTrade, checkCircuitBreaker, CIRCUIT_BREAKER_ERROR_THRESHOLD,
 };

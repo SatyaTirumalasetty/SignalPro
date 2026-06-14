@@ -51,4 +51,37 @@ async function sendPasswordResetEmail(email, token) {
   );
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail };
+async function sendAutoTradingOrderEmail(email, { symbol, side, quantity, price }) {
+  await sendEmail(
+    email,
+    `${APP_NAME}: Auto-trade executed — ${side.toUpperCase()} ${symbol}`,
+    `<p>Your auto-trading engine placed a <strong>${side}</strong> order for <strong>${quantity} ${symbol}</strong> at ~${price}.</p>
+     <p>View the details in your <a href="${BASE_URL}/auto-trading">Auto Trading activity log</a>.</p>`
+  );
+}
+
+async function sendAutoTradingDailyLossLimitEmail(email) {
+  await sendEmail(
+    email,
+    `${APP_NAME}: Auto-trading paused — daily loss limit reached`,
+    `<p>Your auto-trading engine has paused new trades for today after reaching your configured daily loss limit.</p>
+     <p>Trading will resume automatically tomorrow. Review your settings in <a href="${BASE_URL}/auto-trading">Auto Trading</a>.</p>`
+  );
+}
+
+async function sendAutoTradingDisabledEmail(email) {
+  await sendEmail(
+    email,
+    `${APP_NAME}: Auto-trading disabled after repeated errors`,
+    `<p>Your auto-trading engine encountered repeated errors and has been automatically disabled to protect your account.</p>
+     <p>Check the activity log and re-enable it from <a href="${BASE_URL}/auto-trading">Auto Trading settings</a> once the issue is resolved.</p>`
+  );
+}
+
+module.exports = {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendAutoTradingOrderEmail,
+  sendAutoTradingDailyLossLimitEmail,
+  sendAutoTradingDisabledEmail,
+};

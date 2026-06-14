@@ -11,6 +11,9 @@ const mockCalculateAll = jest.fn();
 const mockGetNews = jest.fn();
 const mockGenerateSignal = jest.fn();
 const mockPlaceOrder = jest.fn();
+const mockSendAutoTradingOrderEmail = jest.fn();
+const mockSendAutoTradingDailyLossLimitEmail = jest.fn();
+const mockSendAutoTradingDisabledEmail = jest.fn();
 
 jest.mock('../../config/database', () => ({ db: mockDb }));
 jest.mock('../../config/brokerEncryption', () => ({ decryptCredentials: mockDecryptCredentials }));
@@ -20,9 +23,15 @@ jest.mock('../../services/indicators', () => ({ calculateAll: mockCalculateAll }
 jest.mock('../../services/alpacaMarketData', () => ({ getNews: mockGetNews }));
 jest.mock('../../services/aiAnalysis', () => ({ generateSignal: mockGenerateSignal }));
 jest.mock('../../services/orderExecution', () => ({ placeOrder: mockPlaceOrder }));
+jest.mock('../../services/emailService', () => ({
+  sendAutoTradingOrderEmail: mockSendAutoTradingOrderEmail,
+  sendAutoTradingDailyLossLimitEmail: mockSendAutoTradingDailyLossLimitEmail,
+  sendAutoTradingDisabledEmail: mockSendAutoTradingDisabledEmail,
+}));
 
 const {
   analyzeAndTrade, runForUser, runAutoTradingCycle, getAutoTradingSettings, DEFAULT_SETTINGS,
+  checkCircuitBreaker, CIRCUIT_BREAKER_ERROR_THRESHOLD,
 } = require('../../services/autoTradingEngine');
 
 const USER_ID = 'user-1';
@@ -48,6 +57,10 @@ beforeEach(() => {
   mockDecryptCredentials.mockReturnValue({ api_key: 'k', secret: 's' });
   mockGetAdapter.mockReturnValue({ getAccountInfo: jest.fn().mockResolvedValue({ funds: { equity: 100000 } }) });
   mockDb.none.mockResolvedValue(undefined);
+  mockDb.manyOrNone.mockResolvedValue([]); // default: circuit breaker not tripped
+  mockSendAutoTradingOrderEmail.mockResolvedValue(undefined);
+  mockSendAutoTradingDailyLossLimitEmail.mockResolvedValue(undefined);
+  mockSendAutoTradingDisabledEmail.mockResolvedValue(undefined);
 });
 
 describe('getAutoTradingSettings', () => {
@@ -209,6 +222,40 @@ describe('analyzeAndTrade', () => {
       expect.arrayContaining(['order_placed', 'sig-1', 'order-1'])
     );
   });
+
+  test('emails the user when an order is placed and an email is provided', async () => {
+    mockDb.oneOrNone
+      .mockResolvedValueOnce(null) // cooldown
+      .mockResolvedValueOnce(null); // no existing position
+    mockDb.one
+      .mockResolvedValueOnce({ count: '0' }) // trades today
+      .mockResolvedValueOnce({ realized_pnl: '0' }); // daily loss check
+    mockGenerateSignal.mockResolvedValueOnce({
+      id: 'sig-1', signal: 'buy', confidence: 90, reasoning: 'strong setup',
+      entry_price: 150, stop_loss: 140, take_profit: 170,
+    });
+    mockPlaceOrder.mockResolvedValueOnce({ id: 'order-1', status: 'pending' });
+
+    await analyzeAndTrade(USER_ID, SETTINGS, CONN, 'AAPL', '1h', 'user@example.com');
+
+    expect(mockSendAutoTradingOrderEmail).toHaveBeenCalledWith('user@example.com', expect.objectContaining({
+      symbol: 'AAPL', side: 'buy', quantity: 100, price: 150,
+    }));
+  });
+
+  test('emails the user once per day when the daily loss limit is hit', async () => {
+    mockDb.oneOrNone
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockDb.one
+      .mockResolvedValueOnce({ count: '0' })
+      .mockRejectedValueOnce(Object.assign(new Error('Daily loss limit reached'), { code: 'RISK_LIMIT_EXCEEDED' }));
+    mockGenerateSignal.mockResolvedValueOnce({ id: 'sig-1', signal: 'buy', confidence: 90, reasoning: 'strong', entry_price: 150, stop_loss: 140, take_profit: 170 });
+
+    await analyzeAndTrade(USER_ID, SETTINGS, CONN, 'AAPL', '1h', 'user@example.com');
+
+    expect(mockSendAutoTradingDailyLossLimitEmail).toHaveBeenCalledWith('user@example.com');
+  });
 });
 
 describe('runForUser', () => {
@@ -221,6 +268,45 @@ describe('runForUser', () => {
     mockDb.oneOrNone.mockResolvedValueOnce(null);
     await runForUser(USER_ID, SETTINGS);
     expect(mockGetHistoricalData).not.toHaveBeenCalled();
+  });
+
+  test('disables auto-trading and emails the user after consecutive errors trip the circuit breaker', async () => {
+    mockDb.manyOrNone.mockResolvedValueOnce(
+      Array.from({ length: CIRCUIT_BREAKER_ERROR_THRESHOLD }, () => ({ action: 'error' }))
+    );
+
+    await runForUser(USER_ID, SETTINGS, 'user@example.com');
+
+    expect(mockDb.none).toHaveBeenCalledWith(expect.stringContaining('UPDATE users'), expect.any(Array));
+    expect(mockDb.none).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO auto_trading_runs'),
+      expect.arrayContaining(['auto_disabled_errors'])
+    );
+    expect(mockSendAutoTradingDisabledEmail).toHaveBeenCalledWith('user@example.com');
+    expect(mockDb.oneOrNone).not.toHaveBeenCalled(); // never reached broker connection lookup
+  });
+});
+
+describe('checkCircuitBreaker', () => {
+  test('returns false when there are fewer than the threshold of recent runs', async () => {
+    mockDb.manyOrNone.mockResolvedValueOnce([{ action: 'error' }]);
+    expect(await checkCircuitBreaker(USER_ID)).toBe(false);
+  });
+
+  test('returns false when the most recent runs are not all errors', async () => {
+    mockDb.manyOrNone.mockResolvedValueOnce([
+      { action: 'error' },
+      { action: 'order_placed' },
+      ...Array.from({ length: CIRCUIT_BREAKER_ERROR_THRESHOLD - 2 }, () => ({ action: 'error' })),
+    ]);
+    expect(await checkCircuitBreaker(USER_ID)).toBe(false);
+  });
+
+  test('returns true when the last N runs all errored', async () => {
+    mockDb.manyOrNone.mockResolvedValueOnce(
+      Array.from({ length: CIRCUIT_BREAKER_ERROR_THRESHOLD }, () => ({ action: 'error' }))
+    );
+    expect(await checkCircuitBreaker(USER_ID)).toBe(true);
   });
 });
 

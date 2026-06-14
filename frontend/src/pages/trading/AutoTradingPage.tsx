@@ -15,9 +15,13 @@ import type { AutoTradingRun, AutoTradingSettings, AutoTradingStatus, BrokerConn
 
 const TIMEFRAMES = ['15m', '1h', '4h', '1d']
 
+// Mirrors CIRCUIT_BREAKER_ERROR_THRESHOLD in backend/src/services/autoTradingEngine.js
+const CIRCUIT_BREAKER_ERROR_THRESHOLD = 5
+
 const actionVariant: Record<string, 'success' | 'danger' | 'muted' | 'default'> = {
   order_placed: 'success',
   error: 'danger',
+  auto_disabled_errors: 'danger',
 }
 
 export function AutoTradingPage() {
@@ -72,6 +76,7 @@ export function AutoTradingPage() {
 
   const status = statusQuery.data
   const activity = activityQuery.data?.runs ?? []
+  const wasAutoDisabled = !form.enabled && activity[0]?.action === 'auto_disabled_errors'
 
   const addSymbol = () => {
     const symbol = symbolInput.trim().toUpperCase()
@@ -106,6 +111,13 @@ export function AutoTradingPage() {
           Let SignalPro continuously analyze your watchlist and place trades automatically through your connected broker.
         </p>
       </div>
+
+      {wasAutoDisabled && (
+        <div className="rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          Auto-trading was automatically disabled after {CIRCUIT_BREAKER_ERROR_THRESHOLD} consecutive errors. Review
+          the activity log below, resolve the issue, then re-enable it in Settings.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Status" value={status?.enabled ? 'Enabled' : 'Disabled'} tone={status?.enabled ? 'success' : undefined} />

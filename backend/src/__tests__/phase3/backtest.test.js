@@ -58,4 +58,61 @@ describe('runBacktest', () => {
     expect(result.summary.total_return_pct).toBe(1.5);
     expect(result.summary.final_equity).toBe(101500);
   });
+
+  test('exits on stop-loss when the candle low breaches it', async () => {
+    const candles = [
+      { close: 99,  high: 100, low: 98, time: 't0' },
+      { close: 100, high: 101, low: 99, time: 't1' }, // entry: buy at 100, atr=2 -> stop=96, target=106
+      { close: 95,  high: 96,  low: 94, time: 't2' }, // stop-loss hit (low <= 96)
+    ];
+    mockGetHistoricalData.mockResolvedValue({ candles });
+    mockGenerateSignal
+      .mockReturnValueOnce('buy')  // i=1: open position
+      .mockReturnValueOnce('hold'); // i=2: after stop-loss exit, don't re-enter
+
+    const result = await runBacktest({ symbol: 'AAPL', initialEquity: 100000 });
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].exit_reason).toBe('stop_loss');
+    expect(result.trades[0].exit_price).toBe(96);
+    expect(result.summary.loss_count).toBe(1);
+  });
+
+  test('exits on a sell signal while in a position', async () => {
+    const candles = [
+      { close: 99,  high: 100, low: 98,  time: 't0' },
+      { close: 100, high: 101, low: 99,  time: 't1' }, // entry: buy at 100, atr=2 -> stop=96, target=106
+      { close: 101, high: 102, low: 100, time: 't2' }, // neither stop nor target hit
+    ];
+    mockGetHistoricalData.mockResolvedValue({ candles });
+    mockGenerateSignal
+      .mockReturnValueOnce('buy')  // i=1: open position
+      .mockReturnValueOnce('sell') // i=2: exit on signal
+      .mockReturnValueOnce('hold'); // i=2: don't re-enter
+
+    const result = await runBacktest({ symbol: 'AAPL', initialEquity: 100000 });
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].exit_reason).toBe('signal');
+    expect(result.trades[0].exit_price).toBe(101);
+  });
+
+  test('closes any open position at the end of the data window', async () => {
+    const candles = [
+      { close: 99,  high: 100, low: 98,  time: 't0' },
+      { close: 100, high: 101, low: 99,  time: 't1' }, // entry: buy at 100, atr=2 -> stop=96, target=106
+      { close: 102, high: 103, low: 101, time: 't2' }, // neither stop nor target hit, no sell signal
+    ];
+    mockGetHistoricalData.mockResolvedValue({ candles });
+    mockGenerateSignal
+      .mockReturnValueOnce('buy')  // i=1: open position
+      .mockReturnValueOnce('hold'); // i=2: stay in position
+
+    const result = await runBacktest({ symbol: 'AAPL', initialEquity: 100000 });
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].exit_reason).toBe('end_of_data');
+    expect(result.trades[0].exit_price).toBe(102);
+    expect(result.equity_curve[result.equity_curve.length - 1].equity).toBe(result.summary.final_equity);
+  });
 });

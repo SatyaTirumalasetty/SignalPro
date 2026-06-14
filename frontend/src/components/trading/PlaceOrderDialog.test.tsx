@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, test, expect, vi, beforeEach, type Mock } from 'vitest'
@@ -124,6 +125,34 @@ describe('PlaceOrderDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Place order' }))
 
     expect(await screen.findByText('Insufficient funds')).toBeInTheDocument()
+  })
+
+  test('submits a limit order with a price', async () => {
+    mockConnections(connectedConnections)
+    ;(api.post as Mock).mockResolvedValue({ data: {} })
+    const user = userEvent.setup()
+    renderDialog()
+
+    fireEvent.change(await screen.findByPlaceholderText('Symbol (e.g. AAPL)'), { target: { value: 'AAPL' } })
+    fireEvent.change(screen.getByPlaceholderText('Quantity'), { target: { value: '10' } })
+
+    const comboboxes = screen.getAllByRole('combobox')
+    await user.click(comboboxes[2])
+    await user.click(await screen.findByRole('option', { name: 'Limit' }))
+
+    fireEvent.change(await screen.findByPlaceholderText('Limit price'), { target: { value: '150' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Place order' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/trading/orders', {
+        broker_connection_id: 'conn-1',
+        symbol: 'AAPL',
+        side: 'buy',
+        order_type: 'limit',
+        quantity: 10,
+        price: 150,
+      }),
+    )
   })
 
   test('renders nothing when closed', () => {

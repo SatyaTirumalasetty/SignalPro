@@ -241,4 +241,20 @@ describe('generateSignal()', () => {
       expect(mockDb.one.mock.calls[0][1][13]).not.toContain('"news"');
     });
   });
+
+  test('falls back to incrementing usage_metrics when the insert conflicts', async () => {
+    mockMessageCreate.mockResolvedValueOnce({
+      content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+      usage: { input_tokens: 400, output_tokens: 200 },
+    });
+    mockDb.none
+      .mockResolvedValueOnce(undefined) // signal_cache upsert
+      .mockRejectedValueOnce(new Error('duplicate key')) // usage_metrics insert
+      .mockResolvedValueOnce(undefined); // usage_metrics update fallback
+
+    await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
+
+    expect(mockDb.none).toHaveBeenCalledTimes(3);
+    expect(mockDb.none.mock.calls[2][0]).toContain('UPDATE usage_metrics');
+  });
 });

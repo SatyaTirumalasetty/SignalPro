@@ -166,7 +166,13 @@ async function start() {
   try {
     await initializeDatabase();
     logger.info('✅ Database initialized');
-    
+
+    if (process.env.RUN_MIGRATIONS_ON_START === 'true') {
+      const { runMigrations } = require('./database/migrate');
+      await runMigrations();
+      logger.info('✅ Migrations up to date');
+    }
+
     startCronJobs();
     startAutoTradingCron();
     server.listen(PORT, () => {

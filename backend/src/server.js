@@ -7,7 +7,7 @@ const morgan = require('morgan');
 const WebSocket = require('ws');
 
 const { initializeDatabase } = require('./config/database');
-const { helmetOptions } = require('./config/security');
+const { helmetOptions, buildCorsOrigin } = require('./config/security');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
@@ -38,7 +38,7 @@ const wss = new WebSocket.Server({ server });
 app.use(helmet(helmetOptions));
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: buildCorsOrigin(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],

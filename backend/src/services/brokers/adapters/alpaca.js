@@ -3,6 +3,9 @@ const BaseAdapter = require('./base');
 
 class AlpacaAdapter extends BaseAdapter {
   constructor(credentials) {
+    if (process.env.ALPACA_FORCE_PAPER === 'true' && !credentials.paper) {
+      credentials = { ...credentials, paper: true };
+    }
     super('alpaca', credentials);
     const base = credentials.paper
       ? 'https://paper-api.alpaca.markets'

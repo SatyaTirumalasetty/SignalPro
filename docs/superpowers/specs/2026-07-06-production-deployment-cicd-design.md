@@ -23,7 +23,8 @@ production when — and only when — the full test suite is green.
 | CI engine | GitHub Actions | Repo already on GitHub |
 | Pipeline shape | Direct `master` → prod, gated by tests | Solo project; PRs get Vercel previews |
 | AWS auth from CI | GitHub OIDC federated IAM role | No long-lived AWS keys in GitHub secrets |
-| API HTTPS | CloudFront in front of the ALB (default `*.cloudfront.net` cert) | No custom domain owned; avoids mixed-content blocking from the HTTPS Vercel site; a custom domain can be added later without rework |
+| Domain | **bearbull.app** (to be registered; verified available 2026-07-06) | Site at `bearbull.app` (Vercel), API at `api.bearbull.app`; `.app` enforces HTTPS, matching the design |
+| API HTTPS | ACM certificate on the ALB, `api.bearbull.app` alias via Copilot, DNS zone in Route53 | Free cert, clean URL, avoids mixed-content blocking from the HTTPS Vercel site |
 | Trading mode | Alpaca **paper API only**, enforced by env config | Engine proves itself before real money; live trading is a later, deliberate step |
 
 ## Architecture
@@ -32,17 +33,22 @@ production when — and only when — the full test suite is green.
 GitHub (master) ──► GitHub Actions ──► ECR ──► ECS Fargate service "api"
                          │                       (Express + trading engine)
                          └──► Vercel (React SPA)      │
-                                   │                  ├─► RDS Postgres (db.t4g.micro)
-                                   └── HTTPS ──► CloudFront ──► ALB ──► task
-                                                      ├─► AWS Secrets Manager
-                                                      └─► CloudWatch Logs
+                              bearbull.app            ├─► RDS Postgres (db.t4g.micro)
+                                   │                  ├─► AWS Secrets Manager
+                        api.bearbull.app (HTTPS, ACM) └─► CloudWatch Logs
+                                   └────► ALB ──► task
 ```
 
 - Single Fargate task, 0.25 vCPU / 512 MB (engine is I/O-bound). Always on.
 - ALB health-checks `GET /api/health` (endpoint already exists).
-- The browser talks to the API via the CloudFront HTTPS URL; `VITE_API_BASE_URL`
-  is set to it at frontend build time. Backend CORS allowlist gains the Vercel
-  production domain and preview-domain pattern.
+- **DNS/domain:** `bearbull.app` registered by the owner (verified available
+  2026-07-06); hosted zone in Route53. `bearbull.app` (and `www`) point at
+  Vercel; `api.bearbull.app` is an alias to the ALB with a free ACM
+  certificate, wired through Copilot's app-domain/alias support.
+- The browser talks to the API at `https://api.bearbull.app`;
+  `VITE_API_BASE_URL` is set to it at frontend build time. Backend CORS
+  allowlist gains `bearbull.app`, `www.bearbull.app`, and the Vercel
+  preview-domain pattern.
 
 ## Components
 
@@ -61,8 +67,10 @@ GitHub (master) ──► GitHub Actions ──► ECR ──► ECS Fargate ser
   paper keys, SMTP credentials — stored in AWS Secrets Manager, referenced
   from the service manifest. The backend's existing Secrets Manager loader
   keeps working unchanged.
-- **CloudFront:** enabled via the environment manifest (`cdn: true`) so the
-  API is reachable over HTTPS at the distribution's default domain.
+- **Domain/TLS:** the app is initialized with `--domain bearbull.app` (Route53
+  hosted zone in the same account), and the service manifest sets
+  `http.alias: api.bearbull.app`; Copilot provisions the ACM certificate and
+  Route53 alias automatically.
 - ECS deployment circuit breaker on: a deploy whose tasks fail health checks
   auto-rolls back to the previous revision.
 
@@ -118,13 +126,13 @@ deploy or smoke test fails, the frontend step never runs.
 
 ## Cost estimate
 
-~$40–50/month: Fargate ~$9, ALB ~$16, RDS ~$15, CloudFront/ECR/Secrets/logs
-~$5. Vercel free tier.
+~$40–50/month: Fargate ~$9, ALB ~$16, RDS ~$15, Route53/ECR/Secrets/logs ~$5.
+Plus the `bearbull.app` registration (~$15–20/year). Vercel free tier.
 
 ## Out of scope (later sub-projects)
 
 - Observability dashboard for the trading engine (sub-project 2).
 - Strategy configuration / engine deepening (sub-project 3).
 - UI modernization (sub-project 4).
-- Staging environment, live trading, multi-region, ElastiCache, custom domain
-  (each can be layered on later without rework).
+- Staging environment, live trading, multi-region, ElastiCache (each can be
+  layered on later without rework).

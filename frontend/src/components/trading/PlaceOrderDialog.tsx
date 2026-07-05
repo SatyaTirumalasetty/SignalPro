@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,12 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
   const [stopLoss, setStopLoss] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Tracks the (open, initialValues) pair the fields were last synced from, so we can
+  // detect "the dialog was just (re)opened with new values" during render instead of in
+  // an effect (see https://react.dev/learn/you-might-not-need-an-effect).
+  const [syncedFrom, setSyncedFrom] = useState<{ open: boolean; initialValues?: PlaceOrderInitialValues } | null>(
+    null,
+  )
 
   const connectionsQuery = useQuery({
     queryKey: ['broker-connections'],
@@ -43,22 +49,24 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
   })
   const connections = (connectionsQuery.data ?? []).filter((c) => c.status === 'connected')
 
-  useEffect(() => {
-    if (!brokerConnectionId && connections.length > 0) setBrokerConnectionId(connections[0].id)
-  }, [connections, brokerConnectionId])
+  if (!brokerConnectionId && connections.length > 0) {
+    setBrokerConnectionId(connections[0].id)
+  }
 
-  // Pre-fill from a signal (or other source) whenever the dialog is opened
-  useEffect(() => {
-    if (!open) return
-    setSymbol(initialValues?.symbol ?? '')
-    setSide(initialValues?.side ?? 'buy')
-    setStopLoss(initialValues?.stopLoss ? String(initialValues.stopLoss) : '')
-    setTakeProfit(initialValues?.takeProfit ? String(initialValues.takeProfit) : '')
-    setOrderType('market')
-    setQuantity('')
-    setPrice('')
-    setError(null)
-  }, [open, initialValues])
+  // Pre-fill from a signal (or other source) whenever the dialog is (re)opened
+  if (syncedFrom === null || syncedFrom.open !== open || syncedFrom.initialValues !== initialValues) {
+    setSyncedFrom({ open, initialValues })
+    if (open) {
+      setSymbol(initialValues?.symbol ?? '')
+      setSide(initialValues?.side ?? 'buy')
+      setStopLoss(initialValues?.stopLoss ? String(initialValues.stopLoss) : '')
+      setTakeProfit(initialValues?.takeProfit ? String(initialValues.takeProfit) : '')
+      setOrderType('market')
+      setQuantity('')
+      setPrice('')
+      setError(null)
+    }
+  }
 
   const placeMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/trading/orders', payload),

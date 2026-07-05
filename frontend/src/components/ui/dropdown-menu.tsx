@@ -1,8 +1,15 @@
+import { forwardRef } from 'react'
 import * as RadixDropdown from '@radix-ui/react-dropdown-menu'
 import { cn } from '@/lib/utils'
 
-export const DropdownMenu = RadixDropdown.Root
-export const DropdownMenuTrigger = RadixDropdown.Trigger
+export function DropdownMenu(props: RadixDropdown.DropdownMenuProps) {
+  return <RadixDropdown.Root {...props} />
+}
+
+export const DropdownMenuTrigger = forwardRef<HTMLButtonElement, RadixDropdown.DropdownMenuTriggerProps>(
+  (props, ref) => <RadixDropdown.Trigger ref={ref} {...props} />,
+)
+DropdownMenuTrigger.displayName = 'DropdownMenuTrigger'
 
 export function DropdownMenuContent({ className, ...props }: RadixDropdown.DropdownMenuContentProps) {
   return (

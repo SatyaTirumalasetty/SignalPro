@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,9 +52,13 @@ export function AutoTradingPage() {
     refetchInterval: 60_000,
   })
 
-  useEffect(() => {
-    if (settingsQuery.data && !form) setForm(settingsQuery.data)
-  }, [settingsQuery.data, form])
+  // Hydrate the editable form once from the fetched settings (during render, not in an
+  // effect: https://react.dev/learn/you-might-not-need-an-effect). The `!form` guard makes
+  // this a one-time initialization -- once set, later settingsQuery.data changes don't
+  // clobber in-progress edits.
+  if (settingsQuery.data && !form) {
+    setForm(settingsQuery.data)
+  }
 
   const saveMutation = useMutation({
     mutationFn: (payload: AutoTradingSettings) => api.put<{ settings: AutoTradingSettings }>('/auto-trading/settings', payload),

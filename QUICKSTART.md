@@ -42,7 +42,7 @@ curl http://localhost:3001/api/health
 ```bash
 # Terminal 1: PostgreSQL
 docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -v postgres_data:/var/lib/postgresql/data postgres:14-alpine
-psql -h localhost -U postgres < database/init.sql
+psql -h localhost -U postgres < backend/database/init.sql
 
 # Terminal 2: Redis
 docker run --name redis -p 6379:6379 redis:7-alpine
@@ -121,7 +121,7 @@ signalpro-enterprise/
 │   └── package.json
 ├── frontend/                 # React app (phase 6)
 ├── admin/                    # Admin dashboard (phase 5)
-├── database/
+├── backend/database/
 │   └── init.sql             # PostgreSQL schema
 ├── ROADMAP.md               # Phase-by-phase plan
 ├── DEPLOYMENT_GUIDE.md      # Production AWS setup
@@ -157,7 +157,7 @@ npm run format
 
 ### Adding Database Changes
 
-1. Create migration in `database/migrations/`
+1. Create migration in `backend/database/migrations/`
 2. Run: `npm run migrate`
 3. Update schema docs
 
@@ -340,7 +340,7 @@ psql -h localhost -U postgres -d signalpro_dev
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS positions CASCADE;
 -- ... drop all tables ...
-psql -h localhost -U postgres -d signalpro_dev < database/init.sql
+psql -h localhost -U postgres -d signalpro_dev < backend/database/init.sql
 ```
 
 ---

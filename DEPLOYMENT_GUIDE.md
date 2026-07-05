@@ -51,7 +51,7 @@ CREATE USER signalpro_user WITH PASSWORD 'secure_password';
 GRANT ALL PRIVILEGES ON DATABASE signalpro_dev TO signalpro_user;
 
 # Run schema initialization
-psql -U signalpro_user -d signalpro_dev -f ../database/init.sql
+psql -U signalpro_user -d signalpro_dev -f backend/database/init.sql
 ```
 
 ### Step 4: Start Development Server
@@ -137,7 +137,7 @@ aws rds describe-db-instances --query 'DBInstances[0].Endpoint.Address'
 
 # Connect and run schema
 psql -h signalpro-prod.xxxxx.ap-southeast-1.rds.amazonaws.com \
-     -U admin -d signalpro_prod < database/init.sql
+     -U admin -d signalpro_prod < backend/database/init.sql
 ```
 
 #### 2. ElastiCache Redis
@@ -254,7 +254,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   redis:
     image: redis:7-alpine

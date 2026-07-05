@@ -9,7 +9,7 @@
 **Goal:** Get auth, database, and basic API working
 
 ### Week 1
-- [ ] PostgreSQL setup with full schema (database/init.sql)
+- [ ] PostgreSQL setup with full schema (backend/database/init.sql)
 - [ ] Node.js + Express project initialization
 - [ ] Database migrations and seed data
 - [ ] User registration and login endpoints

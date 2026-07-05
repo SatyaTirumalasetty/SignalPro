@@ -399,7 +399,7 @@ Backups:       S3 + AWS Backup
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | Complete data model (14 tables, relationships, indexes) |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Local Docker + production AWS setup |
 | backend/src/routes/*.js | API endpoint documentation |
-| database/init.sql | SQL schema with all DDL |
+| backend/database/init.sql | SQL schema with all DDL |
 
 ---
 

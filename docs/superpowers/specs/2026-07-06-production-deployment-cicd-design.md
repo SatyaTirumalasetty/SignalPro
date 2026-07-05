@@ -76,7 +76,7 @@ GitHub (master) ──► GitHub Actions ──► ECR ──► ECS Fargate ser
 
 ### Database initialization & migrations
 
-- Fresh production database initialized from `database/init.sql` (one-time,
+- Fresh production database initialized from `backend/database/init.sql` (one-time,
   during environment setup).
 - `npm run migrate` runs at container startup, before the server listens.
   With a single task there is no migration race. If a migration fails, the

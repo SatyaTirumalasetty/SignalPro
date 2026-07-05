@@ -12,7 +12,7 @@ Use this checklist to track progress through all 6 phases.
 
 #### Mon-Tue: Database Setup
 - [ ] PostgreSQL 14+ installed locally
-- [ ] Run `database/init.sql` to create schema
+- [ ] Run `backend/database/init.sql` to create schema
 - [ ] Verify all 14 tables created:
   ```sql
   SELECT tablename FROM pg_tables WHERE schemaname='public';

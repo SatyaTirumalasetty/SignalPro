@@ -7,7 +7,7 @@
 
 1. Started `docker compose up -d postgres redis` (remapped Postgres host port `5433:5432` in `docker-compose.yml` to avoid a conflict with a native Windows PostgreSQL service already bound to `5432`; internal container networking on `postgres:5432` is unaffected).
 2. Created `backend/.env` from `.env.example`: generated fresh `JWT_SECRET`/`JWT_REFRESH_SECRET`/`ENCRYPTION_KEY`/`ENCRYPTION_IV`, pointed DB config at the local Docker Postgres (`signalpro`/`signalpro_dev_password`@`localhost:5433`), set `NODE_ENV=development`, set frontend/API URLs to `localhost:5173`/`localhost:3001`, and blanked SMTP credentials so the backend logs verification emails instead of sending them (dev-mode fallback already built into `emailService.js`).
-3. Loaded `database/init.sql` plus migrations `001`/`002` into the running container, then wrote and applied a new migration `database/migrations/003_users_role_column.sql` (see Bug 2 below).
+3. Loaded `backend/database/init.sql` plus migrations `001`/`002` into the running container, then wrote and applied a new migration `backend/database/migrations/003_users_role_column.sql` (see Bug 2 below).
 4. Started backend (`npm run dev` → health check OK on `:3001`) and frontend (`npm run dev` → `:5173`).
 5. Installed `playwright` as a temporary devDependency in `frontend/`, wrote `e2e-test.cjs` (a 13-scenario runner that registers a fresh user, fetches its email-verification token directly from Postgres via `docker exec ... psql` to bypass SMTP, then walks the full golden path), and ran it iteratively — fixing both real app bugs and test-script issues as they surfaced (9 iterations total).
 
@@ -48,7 +48,7 @@ useEffect(() => {
 ```
 
 ### 2. Missing `users.role` column — every login failed
-**File (new):** `database/migrations/003_users_role_column.sql`
+**File (new):** `backend/database/migrations/003_users_role_column.sql`
 `backend/src/routes/auth.js` and `backend/src/middleware/auth.js` select `role` from `users` and embed it in JWTs (defaulting to `'user'`), but the column didn't exist in the schema actually loaded — every login query failed with Postgres error `42703: column "role" does not exist`, blocking all sign-ins. Added and applied:
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'user';
@@ -111,7 +111,7 @@ Compound indicators (MACD, Bollinger Bands, Stochastic) rendered as raw JSON blo
 ## Files changed for this testing effort (kept)
 
 - `docker-compose.yml` — Postgres host port remapped `5433:5432` (local dev port-conflict workaround)
-- `database/migrations/003_users_role_column.sql` — new migration adding the missing `users.role` column (real schema fix, needed in all environments)
+- `backend/database/migrations/003_users_role_column.sql` — new migration adding the missing `users.role` column (real schema fix, needed in all environments)
 - `backend/src/routes/analysis.js` — real bug fix (wrong variable passed to `generateSignal`)
 - `frontend/src/pages/auth/VerifyEmailPage.tsx`, `frontend/src/lib/format.ts`, `frontend/src/lib/api.ts`, `frontend/src/components/PriceChart.tsx`, `frontend/src/types/api.ts`, `frontend/src/pages/market/MarketPage.tsx` — real bug fixes / cosmetic improvements
 

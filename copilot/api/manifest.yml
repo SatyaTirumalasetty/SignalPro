@@ -1,0 +1,38 @@
+name: api
+type: Load Balanced Web Service
+
+http:
+  path: '/'
+  alias: api.bearbull.app
+  healthcheck:
+    path: '/api/health'
+    healthy_threshold: 2
+    unhealthy_threshold: 3
+    interval: 15s
+    timeout: 5s
+    grace_period: 180s   # cold start runs migrations before listening
+
+image:
+  build:
+    dockerfile: Dockerfile
+    context: .
+  port: 3001
+
+cpu: 256
+memory: 512
+count: 1
+exec: true
+
+network:
+  vpc:
+    placement: 'public'   # public subnets avoid ~$32/mo NAT gateway; SG still restricts ingress to the ALB
+
+variables:
+  NODE_ENV: production
+  PORT: '3001'
+  RUN_MIGRATIONS_ON_START: 'true'
+  AWS_SECRETS_MANAGER_SECRET_ID: signalpro/prod/app
+  ALPACA_FORCE_PAPER: 'true'
+  FRONTEND_URL: https://bearbull.app
+  FRONTEND_URLS: https://bearbull.app,https://www.bearbull.app
+  CORS_ALLOW_VERCEL_PREVIEWS: 'true'

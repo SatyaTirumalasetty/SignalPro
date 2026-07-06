@@ -246,10 +246,13 @@ copilot svc status --name api --env prod                 # task health, running 
 (`copilot/api/manifest.yml`, path `/api/health`, `grace_period: 180s` to allow
 migrations to run before the first check) is backed by ECS's deployment
 circuit breaker. If the new task definition never passes its health check —
-for example a migration throws in `backend/src/database/migrate.js`, which
-calls `process.exit(1)` before `server.listen()` ever runs — ECS detects the
-failed rollout and automatically rolls back to the last healthy task
-definition. No manual action needed; nothing to do but read the logs.
+for example a migration throws during startup — `server.js`'s startup catch
+block calls `process.exit(1)` before `server.listen()` ever runs (`migrate.js`
+only calls `process.exit()` directly when it is run standalone via `npm run
+migrate`, not when `runMigrations()` is invoked from `server.js` at boot) —
+ECS detects the failed rollout and automatically rolls back to the last
+healthy task definition. No manual action needed; nothing to do but read the
+logs.
 
 **Manual:** to force a specific known-good version back onto production,
 check out that commit and redeploy from it:
@@ -279,6 +282,24 @@ aws secretsmanager put-secret-value --region us-east-1 --secret-id signalpro/pro
 rm /tmp/app-secret.json
 copilot svc deploy --name api --env prod   # restarts the task so it re-reads the secret
 ```
+
+**Exception: `DB_PASSWORD`.** Unlike other secrets, RDS's
+`MasterUserPassword` is only resolved from the secret at
+**environment-stack deploy time**, not on every task boot. Editing the
+secret value alone does not change what's set on the RDS instance. Rotating
+`DB_PASSWORD` requires one of:
+
+```bash
+aws rds modify-db-instance --db-instance-identifier <id> \
+  --master-user-password '<new-password>' --apply-immediately
+```
+
+or updating the secret and then running `copilot env deploy --name prod` to
+push the new value onto the RDS master user. Either way, this must happen
+**before** restarting the app's tasks — if the tasks restart and pick up the
+new secret value while RDS still has the old password, the app and RDS
+disagree and the next task cycle (deploy, autoscale event, or ECS-triggered
+replacement) becomes an outage.
 
 ### Monthly cost
 

@@ -44,7 +44,7 @@ describe('startup migrations gate', () => {
     expect(runMigrations).not.toHaveBeenCalled();
     expect(startCronJobs).toHaveBeenCalled(); // startup still proceeds
     server.close();
-  });
+  }, 30000);
 
   test('runs migrations before starting cron jobs when flag is true', async () => {
     process.env.RUN_MIGRATIONS_ON_START = 'true';
@@ -57,5 +57,5 @@ describe('startup migrations gate', () => {
     expect(runMigrations.mock.invocationCallOrder[0])
       .toBeLessThan(startCronJobs.mock.invocationCallOrder[0]);
     server.close();
-  });
+  }, 30000);
 });

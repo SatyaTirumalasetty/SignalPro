@@ -35,4 +35,5 @@ variables:
   ALPACA_FORCE_PAPER: 'true'
   FRONTEND_URL: https://bearbull.app
   FRONTEND_URLS: https://bearbull.app,https://www.bearbull.app
-  CORS_ALLOW_VERCEL_PREVIEWS: 'true'
+  # enable temporarily only when a Vercel preview must call prod; 'true' admits every *.vercel.app origin
+  CORS_ALLOW_VERCEL_PREVIEWS: 'false'

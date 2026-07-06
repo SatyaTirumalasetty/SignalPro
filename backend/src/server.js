@@ -7,7 +7,7 @@ const morgan = require('morgan');
 const WebSocket = require('ws');
 
 const { initializeDatabase } = require('./config/database');
-const { helmetOptions } = require('./config/security');
+const { helmetOptions, buildCorsOrigin } = require('./config/security');
 const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
@@ -31,6 +31,7 @@ const backtestRoutes = require('./routes/backtest');
 const autoTradingRoutes = require('./routes/autoTrading');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -38,7 +39,7 @@ const wss = new WebSocket.Server({ server });
 app.use(helmet(helmetOptions));
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: buildCorsOrigin(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
@@ -166,7 +167,13 @@ async function start() {
   try {
     await initializeDatabase();
     logger.info('✅ Database initialized');
-    
+
+    if (process.env.RUN_MIGRATIONS_ON_START === 'true') {
+      const { runMigrations } = require('./database/migrate');
+      await runMigrations();
+      logger.info('✅ Migrations up to date');
+    }
+
     startCronJobs();
     startAutoTradingCron();
     server.listen(PORT, () => {

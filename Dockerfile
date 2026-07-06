@@ -12,6 +12,7 @@ FROM base AS runner
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY backend/src ./src
+COPY backend/database ./database
 COPY backend/package.json ./
 
 RUN addgroup -S signalpro && adduser -S signalpro -G signalpro

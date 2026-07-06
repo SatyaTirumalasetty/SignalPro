@@ -1,7 +1,11 @@
+import { forwardRef } from 'react'
 import * as RadixTabs from '@radix-ui/react-tabs'
 import { cn } from '@/lib/utils'
 
-export const Tabs = RadixTabs.Root
+export const Tabs = forwardRef<HTMLDivElement, RadixTabs.TabsProps>((props, ref) => (
+  <RadixTabs.Root ref={ref} {...props} />
+))
+Tabs.displayName = 'Tabs'
 
 export function TabsList({ className, ...props }: RadixTabs.TabsListProps) {
   return (

@@ -1,0 +1,51 @@
+Parameters:
+  App:
+    Type: String
+  Env:
+    Type: String
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: SignalPro prod database subnets
+      SubnetIds: !Split [',', Fn::ImportValue: !Sub '${App}-${Env}-PrivateSubnets']
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Postgres access from the Copilot environment
+      VpcId:
+        Fn::ImportValue: !Sub '${App}-${Env}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub '${App}-${Env}-EnvironmentSecurityGroup'
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      EngineVersion: '16'
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: '20'
+      StorageType: gp3
+      DBName: signalpro
+      MasterUsername: signalpro
+      MasterUserPassword: '{{resolve:secretsmanager:signalpro/prod/app:SecretString:DB_PASSWORD}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 7
+      DeleteAutomatedBackups: false
+
+Outputs:
+  DbEndpoint:
+    Description: RDS endpoint hostname (copy into the signalpro/prod/app secret as DB_HOST)
+    Value: !GetAtt Database.Endpoint.Address

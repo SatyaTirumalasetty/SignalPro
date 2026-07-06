@@ -1,5 +1,3 @@
-const path = require('path');
-
 const executed = [];
 const t = { none: jest.fn((sql, params) => { executed.push({ sql, params }); return Promise.resolve(); }) };
 const mockDb = {

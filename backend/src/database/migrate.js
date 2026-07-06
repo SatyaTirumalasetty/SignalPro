@@ -17,7 +17,8 @@ function listMigrationFiles() {
   return fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.sql'))
-    .sort();
+    // Explicit code-unit comparator: migration order must not vary by locale.
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 async function runMigrations() {
@@ -67,7 +68,7 @@ async function runMigrations() {
 
 module.exports = { runMigrations };
 
-if (require.main === module) {
+if (require.main && require.main.filename === __filename) {
   runMigrations()
     .then(() => {
       logger.info('Migrations complete');

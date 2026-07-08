@@ -47,8 +47,9 @@ async function checkDailyLossLimit({ db, userId, equity, maxDailyLossPct = DEFAU
 // Entries and hold are governed by the master `enabled` flag, not by these.
 const DEFAULT_AUTHORITY = { close: true, adjust_stop: false, partial_exit: false, add: false };
 
-function checkAuthority(authority = DEFAULT_AUTHORITY, action) {
-  if (action in DEFAULT_AUTHORITY) return authority?.[action] === true;
+function checkAuthority(authority, action) {
+  const effective = authority ?? DEFAULT_AUTHORITY;
+  if (action in DEFAULT_AUTHORITY) return effective[action] === true;
   return true;
 }
 

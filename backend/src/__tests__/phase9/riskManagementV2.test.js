@@ -18,6 +18,11 @@ describe('checkAuthority', () => {
   test('user-enabled toggle allows the action', () => {
     expect(checkAuthority({ ...DEFAULT_AUTHORITY, adjust_stop: true }, 'adjust_stop')).toBe(true);
   });
+
+  test('null authority falls back to defaults', () => {
+    expect(checkAuthority(null, 'close')).toBe(true);
+    expect(checkAuthority(null, 'adjust_stop')).toBe(false);
+  });
 });
 
 describe('validateStopAdjustment', () => {

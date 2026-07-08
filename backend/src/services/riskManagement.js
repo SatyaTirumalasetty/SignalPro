@@ -41,9 +41,38 @@ async function checkDailyLossLimit({ db, userId, equity, maxDailyLossPct = DEFAU
   }
 }
 
+// ── Engine v2: authority + position-management guardrails ────────────────────
+
+// Which position-management actions the engine may take autonomously.
+// Entries and hold are governed by the master `enabled` flag, not by these.
+const DEFAULT_AUTHORITY = { close: true, adjust_stop: false, partial_exit: false, add: false };
+
+function checkAuthority(authority = DEFAULT_AUTHORITY, action) {
+  if (action in DEFAULT_AUTHORITY) return authority?.[action] === true;
+  return true;
+}
+
+// Stops may only tighten: higher for longs, lower for shorts. No current
+// stop means setting one is always the safer direction.
+function validateStopAdjustment({ positionType, currentStop, newStop }) {
+  if (!newStop || newStop <= 0) return false;
+  if (currentStop == null) return true;
+  return positionType === 'long' ? newStop > currentStop : newStop < currentStop;
+}
+
+// Whole-share partial exit; 0 means "can't size safely, skip".
+function partialExitQuantity({ positionQty, exitFraction }) {
+  if (!positionQty || !exitFraction || exitFraction <= 0 || exitFraction >= 1) return 0;
+  return Math.floor(positionQty * exitFraction);
+}
+
 module.exports = {
   calculatePositionSize,
   checkDailyLossLimit,
   DEFAULT_RISK_PER_TRADE_PCT,
   DEFAULT_MAX_DAILY_LOSS_PCT,
+  DEFAULT_AUTHORITY,
+  checkAuthority,
+  validateStopAdjustment,
+  partialExitQuantity,
 };

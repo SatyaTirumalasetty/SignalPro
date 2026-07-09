@@ -8,12 +8,71 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Collapsible } from '@/components/ui/collapsible'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatDate, formatNumber, signalBadgeVariant } from '@/lib/format'
-import type { AutoTradingRun, AutoTradingSettings, AutoTradingStatus, BrokerConnection } from '@/types/api'
+import type { AiMode, AutoTradingRun, AutoTradingSettings, AutoTradingStatus, BrokerConnection } from '@/types/api'
 
 const TIMEFRAMES = ['15m', '1h', '4h', '1d']
+
+const AI_MODES: { value: AiMode; label: string; blurb: string; description: string }[] = [
+  {
+    value: 'minimize',
+    label: 'Minimize cost',
+    blurb: 'Cheapest — small model, trimmed context.',
+    description:
+      'Uses the small model with a trimmed context (2 timeframes, fewer candles, no news). Rough cost: cents per day for a small watchlist. Best for proving the loop works; expect noticeably weaker analysis and more conservative decisions.',
+  },
+  {
+    value: 'balanced',
+    label: 'Balanced (default)',
+    blurb: 'Strong model with prompt caching on every decision.',
+    description:
+      'Every symbol gets a full fused multi-timeframe analysis from the standard decision model, with prompt caching to keep repeat costs down. Rough cost: tens of dollars per month at a 5–10 symbol watchlist on 15-minute cycles. The recommended starting point.',
+  },
+  {
+    value: 'tiered',
+    label: 'Tiered by stakes',
+    blurb: 'Cheap screening pass; the strong model only sees candidates.',
+    description:
+      'A small model first screens the watchlist for actionable setups; only screened-in symbols (and every open position) get the full decision model. Best cost/quality ratio for larger watchlists — but adds a screening step that can miss subtle setups.',
+  },
+  {
+    value: 'max',
+    label: 'Max intelligence',
+    blurb: 'Top model with extended thinking on every decision.',
+    description:
+      'The top model reasons step-by-step (extended thinking) over the full context for every decision. Highest analysis quality and the highest cost — can reach hundreds of dollars per month on large watchlists with frequent cycles. Use when decision quality matters more than spend.',
+  },
+]
+
+const AUTHORITY_OPTIONS: { key: keyof AutoTradingSettings['authority']; label: string; description: string }[] = [
+  {
+    key: 'close',
+    label: 'Close positions',
+    description:
+      'The engine may fully close a position when its analysis turns against it — the core of autonomous risk control. On by default. With this off, exits rely entirely on the stop-loss/take-profit placed at entry.',
+  },
+  {
+    key: 'adjust_stop',
+    label: 'Adjust stops',
+    description:
+      'The engine may tighten a stop-loss (e.g. trail it to breakeven) as a trade evolves. It can never widen a stop — that is enforced in code, not left to the AI.',
+  },
+  {
+    key: 'partial_exit',
+    label: 'Partial exits',
+    description:
+      'The engine may scale out — sell part of a winner to lock in profit while the rest runs. Note: the remaining shares are unprotected until the next cycle re-evaluates them.',
+  },
+  {
+    key: 'add',
+    label: 'Add to positions',
+    description:
+      'The engine may add to an existing position (pyramid into winners). Highest risk of the four — most autonomous engines exclude this. Each add is sized by the same risk rules as a new entry.',
+  },
+]
 
 // Mirrors CIRCUIT_BREAKER_ERROR_THRESHOLD in backend/src/services/autoTradingEngine.js
 const CIRCUIT_BREAKER_ERROR_THRESHOLD = 5
@@ -228,6 +287,59 @@ export function AutoTradingPage() {
                 >
                   {tf}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">AI mode</label>
+            <div className="flex flex-col gap-2">
+              {AI_MODES.map((mode) => (
+                <div key={mode.value} className="rounded-lg border border-border p-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="radio"
+                      name="ai_mode"
+                      aria-label={mode.label}
+                      className="mt-1 accent-primary"
+                      checked={form.ai_mode === mode.value}
+                      onChange={() => setForm({ ...form, ai_mode: mode.value })}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">{mode.label}</span>
+                      <span className="block text-xs text-muted">{mode.blurb}</span>
+                    </span>
+                  </label>
+                  <div className="mt-2 pl-7">
+                    <Collapsible summary="Details & cost notes">{mode.description}</Collapsible>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Engine authority</label>
+            <p className="text-xs text-muted">
+              What the engine may do to open positions without asking you. Entries are governed by the enable switch above.
+            </p>
+            <div className="flex flex-col gap-2">
+              {AUTHORITY_OPTIONS.map((opt) => (
+                <div key={opt.key} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                    <Switch
+                      aria-label={opt.label}
+                      checked={form.authority[opt.key]}
+                      onCheckedChange={(checked) =>
+                        setForm({ ...form, authority: { ...form.authority, [opt.key]: checked } })
+                      }
+                    />
+                  </div>
+                  <div className="mt-2">
+                    <Collapsible summary="What this allows">{opt.description}</Collapsible>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

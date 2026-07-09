@@ -4,6 +4,7 @@ const express = require('express');
 const mockGetCurrentPrice = jest.fn();
 const mockGetLiveQuote = jest.fn();
 const mockGetHistoricalData = jest.fn();
+const mockGetHistoricalPage = jest.fn();
 const mockSearchSymbols = jest.fn();
 const mockCalculateAll = jest.fn();
 
@@ -11,6 +12,7 @@ jest.mock('../../services/marketData', () => ({
   getCurrentPrice: mockGetCurrentPrice,
   getLiveQuote: mockGetLiveQuote,
   getHistoricalData: mockGetHistoricalData,
+  getHistoricalPage: mockGetHistoricalPage,
   searchSymbols: mockSearchSymbols,
 }));
 jest.mock('../../services/indicators', () => ({
@@ -58,6 +60,14 @@ beforeEach(() => {
   mockGetCurrentPrice.mockResolvedValue(MOCK_PRICE);
   mockGetLiveQuote.mockResolvedValue(MOCK_QUOTE);
   mockGetHistoricalData.mockResolvedValue(MOCK_HIST);
+  mockGetHistoricalPage.mockResolvedValue({
+    symbol: 'AAPL',
+    interval: '1h',
+    current_price: 150.00,
+    previous_close: 148.50,
+    candles: MOCK_HIST.candles,
+    has_more: false,
+  });
   mockSearchSymbols.mockResolvedValue([{ symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NMS', type: 'EQUITY' }]);
   mockCalculateAll.mockReturnValue(MOCK_INDICATORS);
 });
@@ -141,12 +151,12 @@ describe('GET /api/market/history/:symbol', () => {
 
   test('uses default interval 1h', async () => {
     await request(app).get('/api/market/history/AAPL');
-    expect(mockGetHistoricalData).toHaveBeenCalledWith('AAPL', '1h', 200);
+    expect(mockGetHistoricalPage).toHaveBeenCalledWith('AAPL', '1h', 200, null);
   });
 
   test('accepts custom interval and bars', async () => {
     await request(app).get('/api/market/history/AAPL?interval=1d&bars=50');
-    expect(mockGetHistoricalData).toHaveBeenCalledWith('AAPL', '1d', 50);
+    expect(mockGetHistoricalPage).toHaveBeenCalledWith('AAPL', '1d', 50, null);
   });
 
   test('rejects invalid interval', async () => {

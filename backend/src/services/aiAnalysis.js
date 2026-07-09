@@ -298,8 +298,11 @@ async function callDecisionModel(mode, prompt) {
     system: [{ type: 'text', text: DECISION_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: prompt }],
   };
-  if (mode.thinkingBudget) {
-    request.thinking = { type: 'enabled', budget_tokens: mode.thinkingBudget };
+  // Adaptive thinking replaces the removed budget_tokens API: the model
+  // decides when/how much to think; effort controls the depth.
+  if (mode.effort) {
+    request.thinking = { type: 'adaptive' };
+    request.output_config = { effort: mode.effort };
   }
   const message = await getClient().messages.create(request);
   return {

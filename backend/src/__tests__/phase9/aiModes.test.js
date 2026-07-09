@@ -17,7 +17,7 @@ describe('resolveAiMode', () => {
       expect(mode.name).toBe('balanced');
       expect(mode.decisionModel).toBe('claude-sonnet-4-6');
       expect(mode.screeningModel).toBeNull();
-      expect(mode.thinkingBudget).toBeNull();
+      expect(mode.effort).toBeNull();
       expect(mode.contextProfile).toBe('full');
     }
   });
@@ -35,11 +35,12 @@ describe('resolveAiMode', () => {
     expect(mode.decisionModel).toBe('claude-sonnet-4-6');
   });
 
-  test('max uses the top model with extended thinking and maxTokens above the budget', () => {
+  test('max uses the top model with adaptive thinking at xhigh effort and thinking headroom', () => {
     const mode = load().resolveAiMode('max');
     expect(mode.decisionModel).toBe('claude-opus-4-8');
-    expect(mode.thinkingBudget).toBe(4096);
-    expect(mode.maxTokens).toBeGreaterThan(mode.thinkingBudget);
+    expect(mode.effort).toBe('xhigh');
+    // adaptive thinking spends from max_tokens — needs generous headroom
+    expect(mode.maxTokens).toBeGreaterThanOrEqual(16000);
   });
 
   test('model ids come from env', () => {

@@ -11,7 +11,7 @@ const { generateDecision, screenSymbols } = require('../../services/aiAnalysis')
 
 const MODE = {
   name: 'balanced', screeningModel: null, decisionModel: 'model-x',
-  maxTokens: 1500, thinkingBudget: null, contextProfile: 'full',
+  maxTokens: 1500, effort: null, contextProfile: 'full',
 };
 
 const CONTEXT = {
@@ -80,12 +80,13 @@ describe('generateDecision', () => {
     expect(d.action).toBe('close');
   });
 
-  test('max mode sends extended thinking config', async () => {
-    const maxMode = { ...MODE, decisionModel: 'model-top', maxTokens: 8192, thinkingBudget: 4096 };
+  test('max mode sends adaptive thinking with effort config', async () => {
+    const maxMode = { ...MODE, decisionModel: 'model-top', maxTokens: 16000, effort: 'xhigh' };
     await generateDecision('user-1', CONTEXT, maxMode);
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
       model: 'model-top',
-      thinking: { type: 'enabled', budget_tokens: 4096 },
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'xhigh' },
     }));
   });
 });

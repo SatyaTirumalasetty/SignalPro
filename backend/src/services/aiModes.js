@@ -14,10 +14,11 @@ const AI_MODE_NAMES = ['minimize', 'balanced', 'tiered', 'max'];
 function resolveAiMode(name) {
   const m = models();
   const modes = {
-    minimize: { screeningModel: null, decisionModel: m.small, maxTokens: 1024, thinkingBudget: null, contextProfile: 'trimmed' },
-    balanced: { screeningModel: null, decisionModel: m.decision, maxTokens: 1500, thinkingBudget: null, contextProfile: 'full' },
-    tiered: { screeningModel: m.small, decisionModel: m.decision, maxTokens: 1500, thinkingBudget: null, contextProfile: 'full' },
-    max: { screeningModel: null, decisionModel: m.top, maxTokens: 8192, thinkingBudget: 4096, contextProfile: 'full' },
+    minimize: { screeningModel: null, decisionModel: m.small, maxTokens: 1024, effort: null, contextProfile: 'trimmed' },
+    balanced: { screeningModel: null, decisionModel: m.decision, maxTokens: 1500, effort: null, contextProfile: 'full' },
+    tiered: { screeningModel: m.small, decisionModel: m.decision, maxTokens: 1500, effort: null, contextProfile: 'full' },
+    // Adaptive thinking spends from max_tokens, so max mode gets headroom.
+    max: { screeningModel: null, decisionModel: m.top, maxTokens: 16000, effort: 'xhigh', contextProfile: 'full' },
   };
   const key = AI_MODE_NAMES.includes(name) ? name : 'balanced';
   return { name: key, ...modes[key] };

@@ -10,3 +10,10 @@ if (!window.HTMLElement.prototype.scrollIntoView) {
 if (!window.HTMLElement.prototype.releasePointerCapture) {
   window.HTMLElement.prototype.releasePointerCapture = () => {}
 }
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

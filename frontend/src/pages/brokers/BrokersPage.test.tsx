@@ -17,7 +17,7 @@ vi.mock('@/hooks/useToast', () => ({
 }))
 
 const supported: SupportedBroker[] = [
-  { id: 'alpaca', name: 'Alpaca', description: 'US equities', markets: ['US'], auth_type: 'api_key', credential_fields: [{ key: 'api_key', label: 'API Key', type: 'text', required: true }] },
+  { id: 'alpaca', name: 'Alpaca', description: 'US equities', markets: ['US'], auth_type: 'api_key', credential_fields: [{ key: 'api_key', label: 'API Key', type: 'text', required: true }, { key: 'paper', label: 'Paper Trading (sandbox)', type: 'boolean', required: false }] },
 ]
 
 const connections: BrokerConnection[] = [
@@ -89,6 +89,27 @@ describe('BrokersPage', () => {
       expect(api.post).toHaveBeenCalledWith('/brokers/connect', { broker_id: 'alpaca', credentials: { api_key: 'secret-key' }, name: undefined }),
     )
     await waitFor(() => expect(toastFn).toHaveBeenCalledWith('Broker connected', 'success'))
+  })
+
+  test('boolean credential fields render as a switch and submit as booleans', async () => {
+    mockApi()
+    ;(api.post as Mock).mockResolvedValue({ data: {} })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /Connect/ }))
+    expect(await screen.findByText('Connect Alpaca')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByPlaceholderText('API Key *'), 'secret-key')
+    await userEvent.click(screen.getByRole('switch', { name: /paper trading/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/brokers/connect', {
+        broker_id: 'alpaca',
+        credentials: { api_key: 'secret-key', paper: true },
+        name: undefined,
+      }),
+    )
   })
 
   test('disconnects a broker', async () => {

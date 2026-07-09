@@ -100,7 +100,7 @@ export function OrdersPage() {
                     </TableCell>
                     <TableCell className="text-muted">{formatDate(order.created_at)}</TableCell>
                     <TableCell>
-                      {order.status?.toLowerCase() === 'pending' && (
+                      {['pending', 'open', 'partially_filled'].includes(order.status?.toLowerCase() ?? '') && (
                         <Button
                           size="sm"
                           variant="outline"

@@ -106,4 +106,45 @@ describe('OrdersPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Created' }))
     expect(screen.getByText('AAPL')).toBeInTheDocument()
   })
+
+  test('shows Cancel for open and partially_filled orders, not for filled', async () => {
+    mockApiGet({
+      orders: [
+        {
+          id: 'o1',
+          symbol: 'AAPL',
+          side: 'buy',
+          order_type: 'market',
+          quantity: 10,
+          price: 150,
+          stop_loss: 140,
+          take_profit: 170,
+          status: 'open',
+          created_at: '2026-06-01T00:00:00.000Z',
+        },
+        {
+          id: 'o2',
+          symbol: 'MSFT',
+          side: 'sell',
+          order_type: 'limit',
+          quantity: 5,
+          status: 'partially_filled',
+          created_at: '2026-06-02T00:00:00.000Z',
+        },
+        {
+          id: 'o3',
+          symbol: 'GOOGL',
+          side: 'buy',
+          order_type: 'market',
+          quantity: 20,
+          price: 140,
+          status: 'filled',
+          created_at: '2026-06-03T00:00:00.000Z',
+        },
+      ],
+    })
+    renderPage()
+    const cancelButtons = await screen.findAllByRole('button', { name: 'Cancel' })
+    expect(cancelButtons).toHaveLength(2)
+  })
 })

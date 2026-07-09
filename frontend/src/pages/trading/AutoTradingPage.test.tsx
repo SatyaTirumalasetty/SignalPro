@@ -15,6 +15,11 @@ vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({ toast: toastFn }),
 }))
 
+// lightweight-charts needs a real canvas, which jsdom lacks
+vi.mock('@/components/BenchmarkChart', () => ({
+  BenchmarkChart: () => <div data-testid="benchmark-chart" />,
+}))
+
 const baseSettings: AutoTradingSettings = {
   enabled: true,
   broker_connection_id: 'conn-1',
@@ -281,5 +286,46 @@ describe('AutoTradingPage', () => {
         expect.objectContaining({ authority: expect.objectContaining({ adjust_stop: true }) }),
       ),
     )
+  })
+
+  test('renders new action types with variants and timeframe alignment source', async () => {
+    const runs: AutoTradingRun[] = [
+      {
+        id: 'r1', symbol: 'AAPL', timeframe: '1h+4h', decision: 'close', confidence: 88,
+        action: 'position_closed', signal_id: null, order_id: null,
+        reasoning: 'trend broke', error_message: null, created_at: '2026-07-08T12:00:00.000Z',
+        action_detail: { decision: { timeframe_alignment: { '1h': 'bearish', '4h': 'neutral' } } },
+      },
+      {
+        id: 'r2', symbol: 'TSLA', timeframe: '1h+4h', decision: 'adjust_stop', confidence: 75,
+        action: 'needs_attention', signal_id: null, order_id: null,
+        reasoning: null, error_message: 'close failed after cancel', created_at: '2026-07-08T12:01:00.000Z',
+        action_detail: null,
+      },
+    ]
+    mockApiGet({ runs })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('position_closed')).toBeInTheDocument())
+    expect(screen.getByText('needs_attention')).toBeInTheDocument()
+    expect(screen.getByText('1h bearish')).toBeInTheDocument()
+    expect(screen.getByText('4h neutral')).toBeInTheDocument()
+  })
+
+  test('renders the benchmark card when series data exists', async () => {
+    mockApiGet()
+    ;(api.get as Mock).mockImplementation((url: string) => {
+      if (url === '/auto-trading/benchmark') {
+        return Promise.resolve({
+          data: { series: [{ date: '2026-07-08', engine_equity: 100100, watchlist_value: 100050 }] },
+        })
+      }
+      if (url === '/auto-trading/settings') return Promise.resolve({ data: { settings: baseSettings } })
+      if (url === '/auto-trading/status') return Promise.resolve({ data: baseStatus })
+      if (url === '/brokers/connections') return Promise.resolve({ data: { connections } })
+      if (url === '/auto-trading/activity') return Promise.resolve({ data: { runs: [], total: 0 } })
+      return Promise.resolve({ data: {} })
+    })
+    renderPage()
+    await waitFor(() => expect(screen.getByText(/Engine vs buy-and-hold/i)).toBeInTheDocument())
   })
 })

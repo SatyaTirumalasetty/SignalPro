@@ -9,10 +9,11 @@ import { Switch } from '@/components/ui/switch'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Collapsible } from '@/components/ui/collapsible'
+import { BenchmarkChart } from '@/components/BenchmarkChart'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatDate, formatNumber, signalBadgeVariant } from '@/lib/format'
-import type { AiMode, AutoTradingRun, AutoTradingSettings, AutoTradingStatus, BrokerConnection } from '@/types/api'
+import type { AiMode, AutoTradingRun, AutoTradingSettings, AutoTradingStatus, BenchmarkPoint, BrokerConnection } from '@/types/api'
 
 const TIMEFRAMES = ['15m', '1h', '4h', '1d']
 
@@ -79,7 +80,12 @@ const CIRCUIT_BREAKER_ERROR_THRESHOLD = 5
 
 const actionVariant: Record<string, 'success' | 'danger' | 'muted' | 'default'> = {
   order_placed: 'success',
+  position_added: 'success',
+  position_closed: 'default',
+  partial_exit: 'default',
+  stop_adjusted: 'default',
   error: 'danger',
+  needs_attention: 'danger',
   auto_disabled_errors: 'danger',
 }
 
@@ -109,6 +115,11 @@ export function AutoTradingPage() {
     queryKey: ['auto-trading-activity'],
     queryFn: async () => (await api.get<{ runs: AutoTradingRun[]; total: number }>('/auto-trading/activity', { params: { limit: 50 } })).data,
     refetchInterval: 60_000,
+  })
+
+  const benchmarkQuery = useQuery({
+    queryKey: ['auto-trading-benchmark'],
+    queryFn: async () => (await api.get<{ series: BenchmarkPoint[] }>('/auto-trading/benchmark')).data.series,
   })
 
   useEffect(() => {
@@ -385,6 +396,30 @@ export function AutoTradingPage() {
         </CardContent>
       </Card>
 
+      {(benchmarkQuery.data?.length ?? 0) > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Engine vs buy-and-hold</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-2 text-xs text-muted">
+              Daily engine equity against an equal-weight buy-and-hold of your watchlist, frozen at the first snapshot.
+            </p>
+            <BenchmarkChart series={benchmarkQuery.data ?? []} />
+          </CardContent>
+        </Card>
+      )}
+      {benchmarkQuery.data?.length === 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Engine vs buy-and-hold</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted">First benchmark snapshot recorded — the comparison chart appears after the second daily snapshot.</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Activity</CardTitle>
@@ -420,8 +455,19 @@ export function AutoTradingPage() {
                     <TableCell>
                       <Badge variant={actionVariant[run.action] ?? 'muted'}>{run.action}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-muted" title={run.reasoning || run.error_message || ''}>
-                      {run.reasoning || run.error_message || '—'}
+                    <TableCell className="max-w-xs text-muted">
+                      <span className="block truncate" title={run.reasoning || run.error_message || ''}>
+                        {run.reasoning || run.error_message || '—'}
+                      </span>
+                      {run.action_detail?.decision?.timeframe_alignment && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {Object.entries(run.action_detail.decision.timeframe_alignment).map(([tf, bias]) => (
+                            <Badge key={tf} variant={bias === 'bullish' ? 'success' : bias === 'bearish' ? 'danger' : 'muted'}>
+                              {tf} {bias}
+                            </Badge>
+                          ))}
+                        </span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

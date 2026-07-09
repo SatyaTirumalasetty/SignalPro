@@ -1,32 +1,30 @@
-// Autonomous trading engine: periodically analyzes each opted-in user's
-// watchlist with the AI signal pipeline and places real orders through
-// their connected broker, subject to the same risk management used for
-// manual orders.
+// Autonomous trading engine v2: each cycle fuses multi-timeframe data per
+// symbol into ONE Claude decision (entry, exit, or adjustment), then runs it
+// through deterministic guardrails before touching the broker.
+// Claude proposes; code disposes.
 
 const cron = require('node-cron');
 const { db } = require('../config/database');
 const { decryptCredentials } = require('../config/brokerEncryption');
 const { getAdapter } = require('./brokers/index');
-const { getHistoricalData } = require('./marketData');
-const { calculateAll } = require('./indicators');
-const { getNews } = require('./alpacaMarketData');
-const { generateSignal } = require('./aiAnalysis');
+const { buildMarketContext, buildScreeningSummaries } = require('./marketContext');
+const { generateDecision, screenSymbols } = require('./aiAnalysis');
+const { resolveAiMode } = require('./aiModes');
+const { ENTRY_ACTIONS } = require('./decisionSchema');
 const riskManagement = require('./riskManagement');
-const { placeOrder } = require('./orderExecution');
+const { executeDecision } = require('./engineActions');
 const {
-  sendAutoTradingOrderEmail,
   sendAutoTradingDailyLossLimitEmail,
   sendAutoTradingDisabledEmail,
 } = require('./emailService');
 const logger = require('../config/logger');
 
-// If a user's last N runs (across all symbols) all errored out, auto-trading is
-// disabled for that user so a persistent failure (e.g. broker outage, bad
-// credentials) doesn't loop forever without anyone noticing.
+// If a user's last N runs all errored out, auto-trading is disabled for that
+// user so a persistent failure doesn't loop forever without anyone noticing.
 const CIRCUIT_BREAKER_ERROR_THRESHOLD = 5;
 
-// In-memory dedupe so the daily-loss-limit email is sent at most once per user
-// per day, regardless of how many symbols/timeframes hit the limit.
+// In-memory dedupe so the daily-loss-limit email is sent at most once per
+// user per day.
 const dailyLossLimitNotified = new Map();
 
 function shouldNotifyDailyLossLimit(userId) {
@@ -46,10 +44,17 @@ const DEFAULT_SETTINGS = {
   max_daily_loss_pct: riskManagement.DEFAULT_MAX_DAILY_LOSS_PCT,
   cooldown_minutes: 60,
   max_trades_per_day: 5,
+  ai_mode: 'balanced',
+  authority: { ...riskManagement.DEFAULT_AUTHORITY },
 };
 
 function getAutoTradingSettings(preferences) {
-  return { ...DEFAULT_SETTINGS, ...(preferences?.auto_trading || {}) };
+  const stored = preferences?.auto_trading || {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    authority: { ...riskManagement.DEFAULT_AUTHORITY, ...(stored.authority || {}) },
+  };
 }
 
 // ── Cycle entry point ─────────────────────────────────────────────────────────
@@ -68,8 +73,6 @@ async function runAutoTradingCycle() {
   await Promise.allSettled(users.map((u) => runForUser(u.id, getAutoTradingSettings(u.preferences), u.email)));
 }
 
-// Returns true if the user's last CIRCUIT_BREAKER_ERROR_THRESHOLD runs (across
-// all symbols/timeframes) all resulted in an error.
 async function checkCircuitBreaker(userId) {
   const recent = (await db.manyOrNone(
     `SELECT action FROM auto_trading_runs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
@@ -89,14 +92,16 @@ async function disableAutoTrading(userId, settings) {
   );
 }
 
+// ── Per-user cycle ────────────────────────────────────────────────────────────
+
 async function runForUser(userId, settings, userEmail) {
-  if (!settings.broker_connection_id || !settings.symbols?.length) return;
+  if (!settings.broker_connection_id) return;
 
   if (await checkCircuitBreaker(userId)) {
     await disableAutoTrading(userId, settings);
     await logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'auto_disabled_errors' });
     if (userEmail) {
-      await sendAutoTradingDisabledEmail(userEmail).catch((err) =>
+      await Promise.resolve(sendAutoTradingDisabledEmail(userEmail)).catch((err) =>
         logger.error({ userId, err: err.message }, 'Failed to send auto-trading disabled email')
       );
     }
@@ -110,128 +115,177 @@ async function runForUser(userId, settings, userEmail) {
   );
   if (!conn) return;
 
-  for (const symbol of settings.symbols) {
-    for (const timeframe of settings.timeframes) {
-      try {
-        await analyzeAndTrade(userId, settings, conn, symbol, timeframe, userEmail);
-      } catch (err) {
-        logger.error({ userId, symbol, timeframe, err: err.message }, 'Auto-trading cycle error');
-        await logRun({ userId, symbol, timeframe, action: 'error', errorMessage: err.message });
-      }
-    }
-  }
-}
-
-// ── Per symbol/timeframe decision ───────────────────────────────────────────────
-
-async function analyzeAndTrade(userId, settings, conn, symbol, timeframe, userEmail) {
-  const cooldownRow = await db.oneOrNone(
-    `SELECT id FROM auto_trading_runs
-     WHERE user_id = $1 AND symbol = $2 AND action = 'order_placed'
-       AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 minute' * $3
-     ORDER BY created_at DESC LIMIT 1`,
-    [userId, symbol, settings.cooldown_minutes]
-  );
-  if (cooldownRow) {
-    return logRun({ userId, symbol, timeframe, action: 'skipped_cooldown' });
-  }
-
-  const { count } = await db.one(
-    `SELECT COUNT(*) FROM auto_trading_runs
-     WHERE user_id = $1 AND action = 'order_placed' AND created_at >= CURRENT_DATE`,
-    [userId]
-  );
-  if (parseInt(count, 10) >= settings.max_trades_per_day) {
-    return logRun({ userId, symbol, timeframe, action: 'skipped_daily_trade_limit' });
-  }
-
-  const histData = await getHistoricalData(symbol, timeframe, 250);
-  if (!histData.candles.length) {
-    return logRun({ userId, symbol, timeframe, action: 'error', errorMessage: `No market data available for ${symbol}` });
-  }
-
-  const indicators = calculateAll(histData.candles);
-  const news = await getNews([symbol], 5);
-  const signal = await generateSignal(userId, symbol, timeframe, histData, indicators, news);
-
-  if (signal.signal === 'hold' || signal.confidence < settings.min_confidence) {
-    return logRun({
-      userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-      action: 'skipped_low_confidence', signalId: signal.id, reasoning: signal.reasoning,
-    });
-  }
-
-  const positionType = signal.signal === 'buy' ? 'long' : 'short';
-  const existing = await db.oneOrNone(
-    `SELECT id FROM positions WHERE user_id = $1 AND symbol = $2 AND status = 'open' AND position_type = $3`,
-    [userId, symbol, positionType]
-  );
-  if (existing) {
-    return logRun({
-      userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-      action: 'skipped_existing_position', signalId: signal.id, reasoning: signal.reasoning,
-    });
-  }
-
-  let equity;
+  let adapter;
   try {
-    const credentials = decryptCredentials(conn.credentials_encrypted);
-    const adapter = getAdapter(conn.broker_id, credentials);
+    adapter = getAdapter(conn.broker_id, decryptCredentials(conn.credentials_encrypted));
+  } catch (err) {
+    return logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'error', errorMessage: `broker adapter: ${err.message}` });
+  }
+
+  // Positions are ground truth from the broker. If we can't see them we can
+  // neither open safely nor manage what exists — skip the whole cycle.
+  let brokerPositions;
+  try {
+    brokerPositions = await adapter.getPositions();
+  } catch (err) {
+    return logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'error', errorMessage: `positions fetch failed: ${err.message}` });
+  }
+  const positionsBySymbol = new Map(brokerPositions.map((p) => [p.symbol, p]));
+
+  // Entry gate: fail closed for entries, fail safe for exits. entryBlocked is
+  // an action string used to log why entries were blocked this cycle.
+  let equity = null;
+  let entryBlocked = null;
+  try {
     const account = await adapter.getAccountInfo();
     equity = account?.funds?.equity;
-
     await riskManagement.checkDailyLossLimit({ db, userId, equity, maxDailyLossPct: settings.max_daily_loss_pct });
   } catch (err) {
     if (err.code === 'RISK_LIMIT_EXCEEDED') {
+      entryBlocked = 'skipped_daily_loss_limit';
       if (userEmail && shouldNotifyDailyLossLimit(userId)) {
-        await sendAutoTradingDailyLossLimitEmail(userEmail).catch((emailErr) =>
+        await Promise.resolve(sendAutoTradingDailyLossLimitEmail(userEmail)).catch((emailErr) =>
           logger.error({ userId, err: emailErr.message }, 'Failed to send daily loss limit email')
         );
       }
-      return logRun({
-        userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-        action: 'skipped_daily_loss_limit', signalId: signal.id, reasoning: signal.reasoning,
-      });
+    } else {
+      entryBlocked = 'skipped_entry_blocked';
+      logger.warn({ userId, err: err.message }, 'Entry guardrails unavailable — blocking entries this cycle');
     }
-    return logRun({
-      userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-      action: 'error', signalId: signal.id, reasoning: signal.reasoning, errorMessage: err.message,
-    });
   }
 
-  const quantity = riskManagement.calculatePositionSize({
-    equity, riskPerTradePct: settings.risk_per_trade_pct, entryPrice: signal.entry_price, stopLoss: signal.stop_loss,
-  });
-  if (quantity <= 0) {
-    return logRun({
-      userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-      action: 'skipped_risk_sizing', signalId: signal.id, reasoning: signal.reasoning,
-    });
+  const { realized_pnl } = await db.one(
+    `SELECT COALESCE(SUM(pnl), 0) as realized_pnl FROM positions
+     WHERE user_id = $1 AND status = 'closed' AND closed_at >= CURRENT_DATE`,
+    [userId]
+  ).catch(() => ({ realized_pnl: 0 }));
+
+  const portfolio = {
+    equity,
+    open_positions: brokerPositions.length,
+    exposure_pct: equity
+      ? +(((brokerPositions.reduce((s, p) => s + (p.market_value || 0), 0)) / equity) * 100).toFixed(1)
+      : null,
+    todays_realized_pnl: parseFloat(realized_pnl) || 0,
+  };
+
+  // Universe: watchlist ∪ symbols with open positions, so a de-watchlisted
+  // symbol keeps being managed until its position closes.
+  const universe = [...new Set([...settings.symbols, ...positionsBySymbol.keys()])];
+  const mode = resolveAiMode(settings.ai_mode);
+
+  // Tiered mode: cheap screening pass picks candidates. Open positions always
+  // pass. Screening failure fails OPEN to analysis (never to trading).
+  let toAnalyze = universe;
+  if (mode.screeningModel && universe.length) {
+    try {
+      const { summaries, unscreenable } = await buildScreeningSummaries(universe, positionsBySymbol);
+      const picked = new Set(await screenSymbols(summaries, mode));
+      toAnalyze = universe.filter(
+        (s) => positionsBySymbol.has(s) || picked.has(s) || unscreenable.includes(s)
+      );
+      for (const symbol of universe.filter((s) => !toAnalyze.includes(s))) {
+        await logRun({ userId, symbol, timeframe: '-', action: 'screened_out' });
+      }
+    } catch (err) {
+      logger.warn({ userId, err: err.message }, 'Screening failed — analyzing all symbols');
+    }
   }
 
-  const order = await placeOrder({
-    userId, brokerConnectionId: conn.id, conn, symbol, side: signal.signal, orderType: 'market',
-    quantity, price: signal.entry_price, stopLoss: signal.stop_loss, takeProfit: signal.take_profit,
-    signalId: signal.id, source: 'auto_engine',
-  });
+  for (const symbol of toAnalyze) {
+    try {
+      await processSymbol({
+        userId, userEmail, settings, conn, adapter, mode, symbol,
+        position: positionsBySymbol.get(symbol) || null,
+        portfolio, entryBlocked, equity,
+      });
+    } catch (err) {
+      logger.error({ userId, symbol, err: err.message }, 'Auto-trading cycle error');
+      await logRun({ userId, symbol, timeframe: settings.timeframes.join('+'), action: 'error', errorMessage: err.message });
+    }
+  }
+}
 
-  if (userEmail) {
-    await sendAutoTradingOrderEmail(userEmail, { symbol, side: signal.signal, quantity, price: signal.entry_price }).catch((err) =>
-      logger.error({ userId, err: err.message }, 'Failed to send auto-trading order email')
+// ── Per-symbol decision + guardrail gate ──────────────────────────────────────
+
+async function processSymbol({
+  userId, userEmail, settings, conn, adapter, mode, symbol, position, portfolio, entryBlocked, equity,
+}) {
+  const timeframeLabel = settings.timeframes.join('+');
+  const context = await buildMarketContext({
+    symbol, timeframes: settings.timeframes, contextProfile: mode.contextProfile, position, portfolio,
+  });
+  const decision = await generateDecision(userId, context, mode);
+
+  const base = {
+    userId, symbol, timeframe: timeframeLabel,
+    decision: decision.action, confidence: decision.confidence,
+    signalId: decision.id, reasoning: decision.reasoning,
+    actionDetail: { decision },
+  };
+
+  if (decision.action === 'hold') return logRun({ ...base, action: 'hold' });
+
+  if (decision.confidence < settings.min_confidence) {
+    return logRun({ ...base, action: 'skipped_low_confidence' });
+  }
+
+  if (!riskManagement.checkAuthority(settings.authority, decision.action)) {
+    return logRun({ ...base, action: 'skipped_authority' });
+  }
+
+  if (ENTRY_ACTIONS.includes(decision.action)) {
+    if (entryBlocked) return logRun({ ...base, action: entryBlocked });
+
+    const cooldownRow = await db.oneOrNone(
+      `SELECT id FROM auto_trading_runs
+       WHERE user_id = $1 AND symbol = $2 AND action IN ('order_placed', 'position_added')
+         AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 minute' * $3
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId, symbol, settings.cooldown_minutes]
     );
+    if (cooldownRow) return logRun({ ...base, action: 'skipped_cooldown' });
+
+    const { count } = await db.one(
+      `SELECT COUNT(*) FROM auto_trading_runs
+       WHERE user_id = $1 AND action IN ('order_placed', 'position_added') AND created_at >= CURRENT_DATE`,
+      [userId]
+    );
+    if (parseInt(count, 10) >= settings.max_trades_per_day) {
+      return logRun({ ...base, action: 'skipped_daily_trade_limit' });
+    }
+
+    // The engine never reverses in one step: with any position open,
+    // open_long/open_short is a conflict (Claude should 'close' first).
+    if ((decision.action === 'open_long' || decision.action === 'open_short') && position) {
+      return logRun({ ...base, action: 'skipped_existing_position' });
+    }
+  } else if (!position) {
+    return logRun({ ...base, action: 'error', errorMessage: 'position action without an open position' });
   }
 
+  const result = await executeDecision({
+    db, adapter, conn, userId, userEmail, settings, symbol, position, decision, equity,
+  });
   return logRun({
-    userId, symbol, timeframe, decision: signal.signal, confidence: signal.confidence,
-    action: 'order_placed', signalId: signal.id, orderId: order.id, reasoning: signal.reasoning,
+    ...base,
+    action: result.action,
+    orderId: result.orderId,
+    errorMessage: result.errorMessage,
+    actionDetail: { decision, execution: result.detail || null },
   });
 }
 
-async function logRun({ userId, symbol, timeframe, decision, confidence, action, signalId, orderId, reasoning, errorMessage }) {
+// ── Run logging ───────────────────────────────────────────────────────────────
+
+async function logRun({ userId, symbol, timeframe, decision, confidence, action, signalId, orderId, reasoning, errorMessage, actionDetail }) {
   await db.none(
-    `INSERT INTO auto_trading_runs (user_id, symbol, timeframe, decision, confidence, action, signal_id, order_id, reasoning, error_message)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [userId, symbol, timeframe, decision || null, confidence ?? null, action, signalId || null, orderId || null, reasoning || null, errorMessage || null]
+    `INSERT INTO auto_trading_runs
+       (user_id, symbol, timeframe, decision, confidence, action, signal_id, order_id, reasoning, error_message, action_detail)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [userId, symbol, timeframe, decision || null, confidence ?? null, action,
+     signalId || null, orderId || null, reasoning || null, errorMessage || null,
+     actionDetail ? JSON.stringify(actionDetail) : null]
   ).catch((err) => logger.error({ err: err.message }, 'Failed to log auto-trading run'));
 }
 
@@ -249,5 +303,5 @@ function startAutoTradingCron() {
 
 module.exports = {
   runAutoTradingCycle, startAutoTradingCron, getAutoTradingSettings, DEFAULT_SETTINGS,
-  runForUser, analyzeAndTrade, checkCircuitBreaker, CIRCUIT_BREAKER_ERROR_THRESHOLD,
+  runForUser, processSymbol, checkCircuitBreaker, CIRCUIT_BREAKER_ERROR_THRESHOLD,
 };

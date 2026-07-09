@@ -437,6 +437,15 @@ export interface SystemHealth {
   }>
 }
 
+export type AiMode = 'minimize' | 'balanced' | 'tiered' | 'max'
+
+export interface AutoTradingAuthority {
+  close: boolean
+  adjust_stop: boolean
+  partial_exit: boolean
+  add: boolean
+}
+
 export interface AutoTradingSettings {
   enabled: boolean
   broker_connection_id: string | null
@@ -447,6 +456,14 @@ export interface AutoTradingSettings {
   max_daily_loss_pct: number
   cooldown_minutes: number
   max_trades_per_day: number
+  ai_mode: AiMode
+  authority: AutoTradingAuthority
+}
+
+export interface BenchmarkPoint {
+  date: string
+  engine_equity: number
+  watchlist_value: number
 }
 
 export interface AutoTradingRun {
@@ -460,6 +477,10 @@ export interface AutoTradingRun {
   order_id: string | null
   reasoning: string | null
   error_message: string | null
+  action_detail: {
+    decision?: { timeframe_alignment?: Record<string, string>; invalidation?: string | null }
+    execution?: Record<string, unknown> | null
+  } | null
   created_at: string
 }
 

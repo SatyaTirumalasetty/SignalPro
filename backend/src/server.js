@@ -12,6 +12,7 @@ const { setupRateLimiting } = require('./middleware/rateLimit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { startCronJobs } = require('./services/brokerSync');
 const { startAutoTradingCron } = require('./services/autoTradingEngine');
+const { startBenchmarkCron } = require('./services/benchmarkService');
 const alpacaMarketData = require('./services/alpacaMarketData');
 const logger = require('./config/logger');
 
@@ -169,6 +170,7 @@ async function start() {
     
     startCronJobs();
     startAutoTradingCron();
+    startBenchmarkCron();
     server.listen(PORT, () => {
       logger.info(`
 ╔════════════════════════════════════════════════╗

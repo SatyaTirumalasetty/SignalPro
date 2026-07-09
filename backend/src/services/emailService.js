@@ -78,10 +78,33 @@ async function sendAutoTradingDisabledEmail(email) {
   );
 }
 
+async function sendAutoTradingActionEmail(email, { symbol, action, detail }) {
+  const label = String(action).replace(/_/g, ' ');
+  await sendEmail(
+    email,
+    `SignalPro auto-trading: ${label} — ${symbol}`,
+    `<p>The autonomous engine executed <strong>${label}</strong> on <strong>${symbol}</strong>.</p>
+     <p>${detail || ''}</p>
+     <p>Review the activity feed on the Auto Trading page for full reasoning.</p>`
+  );
+}
+
+async function sendAutoTradingNeedsAttentionEmail(email, { symbol, message }) {
+  await sendEmail(
+    email,
+    `SignalPro auto-trading NEEDS ATTENTION — ${symbol}`,
+    `<p><strong>Manual review required for ${symbol}.</strong></p>
+     <p>${message}</p>
+     <p>Check your broker account directly — the engine may have left the position without protective orders.</p>`
+  );
+}
+
 module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendAutoTradingOrderEmail,
   sendAutoTradingDailyLossLimitEmail,
   sendAutoTradingDisabledEmail,
+  sendAutoTradingActionEmail,
+  sendAutoTradingNeedsAttentionEmail,
 };

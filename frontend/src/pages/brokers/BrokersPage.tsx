@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatDate } from '@/lib/format'
@@ -181,7 +182,7 @@ export function BrokersPage() {
 function ConnectBrokerDialog({ broker, onClose }: { broker: SupportedBroker | null; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<Record<string, string | boolean>>({})
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -243,13 +244,24 @@ function ConnectBrokerDialog({ broker, onClose }: { broker: SupportedBroker | nu
         <Input placeholder="Connection name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
         {fields.map((field) => (
           <div key={field.key} className="flex flex-col gap-1">
-            <Input
-              type={field.type === 'password' ? 'password' : 'text'}
-              placeholder={`${field.label}${field.required ? ' *' : ''}`}
-              value={values[field.key] ?? ''}
-              onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
-              required={field.required}
-            />
+            {field.type === 'boolean' ? (
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                <span className="text-sm text-foreground">{field.label}</span>
+                <Switch
+                  aria-label={field.label}
+                  checked={Boolean(values[field.key])}
+                  onCheckedChange={(checked) => setValues((v) => ({ ...v, [field.key]: checked }))}
+                />
+              </div>
+            ) : (
+              <Input
+                type={field.type === 'password' ? 'password' : 'text'}
+                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                value={(values[field.key] as string) ?? ''}
+                onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                required={field.required}
+              />
+            )}
             {field.note && <p className="text-xs text-muted">{field.note}</p>}
           </div>
         ))}

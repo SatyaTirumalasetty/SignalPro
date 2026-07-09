@@ -36,6 +36,24 @@ class BaseAdapter {
     throw new Error(`${this.brokerId}: cancelOrder not implemented`);
   }
 
+  // Autonomous-trading capabilities. Brokers that can't do these degrade to
+  // skipped_unsupported_broker in the engine — never a silent no-op.
+  capabilities() {
+    return [];
+  }
+
+  async getOpenOrders(_symbol) {
+    throw this.apiError(`${this.brokerId} does not support autonomous trading via SignalPro`, 501);
+  }
+
+  async closePosition(_symbol, _quantity = null) {
+    throw this.apiError(`${this.brokerId} does not support autonomous trading via SignalPro`, 501);
+  }
+
+  async replaceOrder(_brokerOrderId, _changes = {}) {
+    throw this.apiError(`${this.brokerId} does not support autonomous trading via SignalPro`, 501);
+  }
+
   // Returns updated credentials object if tokens were refreshed, else null
   async refreshToken() {
     return null;

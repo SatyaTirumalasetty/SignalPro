@@ -4,6 +4,7 @@ const { db } = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { getAutoTradingSettings } = require('../services/autoTradingEngine');
+const { AI_MODE_NAMES } = require('../services/aiModes');
 
 const router = express.Router();
 
@@ -30,6 +31,12 @@ router.put('/settings', authenticate, [
   body('max_daily_loss_pct').optional().isFloat({ gt: 0, lt: 1 }),
   body('cooldown_minutes').optional().isInt({ min: 1, max: 1440 }),
   body('max_trades_per_day').optional().isInt({ min: 1, max: 100 }),
+  body('ai_mode').optional().isIn(AI_MODE_NAMES),
+  body('authority').optional().isObject(),
+  body('authority.close').optional().isBoolean().toBoolean(),
+  body('authority.adjust_stop').optional().isBoolean().toBoolean(),
+  body('authority.partial_exit').optional().isBoolean().toBoolean(),
+  body('authority.add').optional().isBoolean().toBoolean(),
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -56,7 +63,11 @@ router.put('/settings', authenticate, [
 
   const user = await db.one('SELECT preferences FROM users WHERE id = $1', [req.user.id]);
   const current = getAutoTradingSettings(user.preferences);
-  const merged = { ...current, ...req.body };
+  const merged = {
+    ...current,
+    ...req.body,
+    authority: { ...current.authority, ...(req.body.authority || {}) },
+  };
 
   const updated = await db.one(
     `UPDATE users
@@ -82,7 +93,7 @@ router.get('/activity', authenticate, [
   const { limit = 50, offset = 0 } = req.query;
 
   const runs = await db.manyOrNone(
-    `SELECT id, symbol, timeframe, decision, confidence, action, signal_id, order_id, reasoning, error_message, created_at
+    `SELECT id, symbol, timeframe, decision, confidence, action, signal_id, order_id, reasoning, error_message, action_detail, created_at
      FROM auto_trading_runs WHERE user_id = $1
      ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
     [req.user.id, parseInt(limit), parseInt(offset)]
@@ -125,6 +136,26 @@ router.get('/status', authenticate, asyncHandler(async (req, res) => {
     last_run_at: lastRun?.created_at || null,
     trades_today: parseInt(tradesToday, 10),
     todays_pnl: parseFloat(todaysPnl),
+  });
+}));
+
+// ── GET /api/auto-trading/benchmark ───────────────────────────────────────────
+// Engine equity vs equal-weight buy-and-hold of the watchlist (frozen at
+// first snapshot). Rendered as the paper-trial comparison chart.
+
+router.get('/benchmark', authenticate, asyncHandler(async (req, res) => {
+  const rows = await db.manyOrNone(
+    `SELECT snapshot_date, engine_equity, watchlist_value
+     FROM benchmark_snapshots WHERE user_id = $1
+     ORDER BY snapshot_date ASC`,
+    [req.user.id]
+  );
+  res.json({
+    series: rows.map((r) => ({
+      date: r.snapshot_date instanceof Date ? r.snapshot_date.toISOString().slice(0, 10) : String(r.snapshot_date),
+      engine_equity: parseFloat(r.engine_equity),
+      watchlist_value: parseFloat(r.watchlist_value),
+    })),
   });
 }));
 

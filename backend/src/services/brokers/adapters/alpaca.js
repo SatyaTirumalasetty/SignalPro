@@ -126,6 +126,51 @@ class AlpacaAdapter extends BaseAdapter {
       throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
     }
   }
+
+  capabilities() {
+    return ['place_order', 'cancel_order', 'close_position', 'replace_order', 'open_orders'];
+  }
+
+  async getOpenOrders(symbol) {
+    try {
+      const { data } = await this.http.get('/v2/orders', { params: { status: 'open', symbols: symbol } });
+      return data.map(o => ({
+        broker_order_id: o.id,
+        symbol: o.symbol,
+        side: o.side,
+        order_type: o.type,
+        quantity: +o.qty,
+        stop_price: o.stop_price ? +o.stop_price : null,
+        limit_price: o.limit_price ? +o.limit_price : null,
+        status: mapStatus(o.status),
+      }));
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
+  }
+
+  async closePosition(symbol, quantity = null) {
+    try {
+      const params = quantity ? { qty: String(quantity) } : {};
+      const { data } = await this.http.delete(`/v2/positions/${encodeURIComponent(symbol)}`, { params });
+      return { order_id: data.id, status: mapStatus(data.status), message: `Alpaca close order ${data.id} ${data.status}` };
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
+  }
+
+  async replaceOrder(brokerOrderId, { stop_price, limit_price, quantity } = {}) {
+    const body = {};
+    if (stop_price != null) body.stop_price = String(stop_price);
+    if (limit_price != null) body.limit_price = String(limit_price);
+    if (quantity != null) body.qty = String(quantity);
+    try {
+      const { data } = await this.http.patch(`/v2/orders/${brokerOrderId}`, body);
+      return { order_id: data.id, status: mapStatus(data.status), message: `Alpaca order ${brokerOrderId} replaced by ${data.id}` };
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
+  }
 }
 
 function mapStatus(s) {

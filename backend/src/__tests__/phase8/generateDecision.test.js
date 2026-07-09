@@ -55,6 +55,16 @@ describe('generateDecision', () => {
     expect(mockDb.one).not.toHaveBeenCalled();
   });
 
+  test('accepts JSON wrapped in markdown fences', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '```json\n' + JSON.stringify(GOOD) + '\n```' }],
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+    const d = await generateDecision('user-1', CONTEXT, MODE);
+    expect(d.action).toBe('open_long');
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
   test('retries once on malformed JSON, then succeeds', async () => {
     mockCreate
       .mockResolvedValueOnce({ content: [{ type: 'text', text: 'not json' }], usage: {} })

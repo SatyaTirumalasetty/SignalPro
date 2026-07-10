@@ -103,4 +103,13 @@ describe('TradeTicket', () => {
       }),
     )
   })
+
+  test('confirm is disabled for non-positive quantity', async () => {
+    renderTicket()
+    await waitFor(() => expect(screen.getByLabelText(/quantity/i)).toHaveValue(200))
+    const quantityInput = screen.getByLabelText(/quantity/i)
+    fireEvent.change(quantityInput, { target: { value: '0' } })
+    const confirmBtn = screen.getByRole('button', { name: /confirm buy/i })
+    expect(confirmBtn).toBeDisabled()
+  })
 })

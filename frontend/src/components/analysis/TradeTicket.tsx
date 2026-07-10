@@ -173,7 +173,7 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
           </p>
         )}
 
-        <Button type="button" onClick={submit} disabled={orderMutation.isPending || !connectionId || !quantity}>
+        <Button type="button" onClick={submit} disabled={orderMutation.isPending || !connectionId || !(Number(quantity) > 0)}>
           {orderMutation.isPending ? 'Placing…' : `Confirm ${side}`}
         </Button>
 

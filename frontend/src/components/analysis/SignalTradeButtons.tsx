@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { prefetchCandles } from '@/hooks/useCandles'
-import { placeInstantOrder } from '@/components/analysis/TradeTicket'
+import { placeInstantOrder } from '@/lib/instantOrder'
 import type { BrokerConnection, Signal } from '@/types/api'
 
 export function SignalTradeButtons({ signal }: { signal: Signal }) {

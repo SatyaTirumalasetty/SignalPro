@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,26 +12,6 @@ import type { BrokerConnection, Signal } from '@/types/api'
 
 interface Prefs { trading?: { instant_orders?: boolean }; [k: string]: unknown }
 
-export async function placeInstantOrder({ symbol, signal, connectionId, equity, riskPct }: {
-  symbol: string; signal: Signal; connectionId: string; equity: number; riskPct: number
-}) {
-  const entry = signal.entry_price ?? 0
-  const stop = signal.stop_loss ?? 0
-  const quantity = sizeByRisk({ equity, riskPct, entry, stop })
-  if (quantity <= 0) throw new Error('Could not size order from risk settings')
-  const res = await api.post<{ order: { id: string } }>('/trading/orders', {
-    broker_connection_id: connectionId,
-    symbol,
-    side: signal.signal_type === 'sell' ? 'sell' : 'buy',
-    order_type: 'market',
-    quantity,
-    stop_loss: signal.stop_loss,
-    take_profit: signal.take_profit,
-    signal_id: signal.id,
-  })
-  return { orderId: res.data.order.id }
-}
-
 export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
   symbol: string; signal?: Signal | null; currentPrice?: number | null; armed?: boolean
 }) {
@@ -43,10 +23,8 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
     queryFn: async () => (await api.get<{ connections: BrokerConnection[] }>('/brokers/connections')).data.connections,
   })
   const connected = (connectionsQuery.data ?? []).filter((c) => c.status === 'connected')
-  const [connectionId, setConnectionId] = useState('')
-  useEffect(() => {
-    if (!connectionId && connected.length) setConnectionId(connected[0].id)
-  }, [connected, connectionId])
+  const [chosenConn, setChosenConn] = useState<string | null>(null)
+  const connectionId = chosenConn ?? connected[0]?.id ?? ''
 
   const accountQuery = useQuery({
     queryKey: ['broker-account', connectionId],
@@ -65,29 +43,34 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
   const equity = accountQuery.data?.funds?.equity ?? null
   const riskPct = settingsQuery.data?.risk_per_trade_pct ?? 0.01
 
-  const [side, setSide] = useState<'buy' | 'sell'>('buy')
+  const [sideOverride, setSideOverride] = useState<'buy' | 'sell' | null>(null)
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
-  const [quantity, setQuantity] = useState('')
+  const [qtyOverride, setQtyOverride] = useState<string | null>(null)
   const [limitPrice, setLimitPrice] = useState('')
-  const [stopLoss, setStopLoss] = useState('')
-  const [takeProfit, setTakeProfit] = useState('')
-  const [seeded, setSeeded] = useState(false)
+  const [stopLossOverride, setStopLossOverride] = useState<string | null>(null)
+  const [takeProfitOverride, setTakeProfitOverride] = useState<string | null>(null)
 
-  // Seed from the signal once sizing inputs are available
-  useEffect(() => {
-    if (seeded || !signal) return
-    setSide(signal.signal_type === 'sell' ? 'sell' : 'buy')
-    if (signal.stop_loss != null) setStopLoss(String(signal.stop_loss))
-    if (signal.take_profit != null) setTakeProfit(String(signal.take_profit))
+  // Defaults are derived from the signal on every render; user edits are tracked
+  // as overrides so a manual edit is never clobbered by late-arriving equity data.
+  const defaultSide: 'buy' | 'sell' = signal?.signal_type === 'sell' ? 'sell' : 'buy'
+  const side = sideOverride ?? defaultSide
+
+  const defaultStopLoss = signal?.stop_loss != null ? String(signal.stop_loss) : ''
+  const stopLoss = stopLossOverride ?? defaultStopLoss
+
+  const defaultTakeProfit = signal?.take_profit != null ? String(signal.take_profit) : ''
+  const takeProfit = takeProfitOverride ?? defaultTakeProfit
+
+  const defaultQuantity = (() => {
+    if (!signal) return ''
     const entry = signal.entry_price ?? currentPrice ?? 0
     if (equity != null && signal.stop_loss != null && entry) {
       const qty = sizeByRisk({ equity, riskPct, entry, stop: signal.stop_loss })
-      if (qty > 0) setQuantity(String(qty))
-      setSeeded(true)
-    } else if (accountQuery.isError) {
-      setSeeded(true) // give up seeding quantity; leave blank
+      if (qty > 0) return String(qty)
     }
-  }, [signal, equity, riskPct, currentPrice, seeded, accountQuery.isError])
+    return ''
+  })()
+  const quantity = qtyOverride ?? defaultQuantity
 
   const instantOrders = Boolean(meQuery.data?.user.preferences?.trading?.instant_orders)
   const toggleInstant = async (checked: boolean) => {
@@ -128,13 +111,13 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex gap-2">
-          <Button type="button" data-active={side === 'buy'} variant={side === 'buy' ? 'default' : 'outline'} onClick={() => setSide('buy')} className="flex-1">Buy</Button>
-          <Button type="button" data-active={side === 'sell'} variant={side === 'sell' ? 'default' : 'outline'} onClick={() => setSide('sell')} className="flex-1">Sell</Button>
+          <Button type="button" data-active={side === 'buy'} variant={side === 'buy' ? 'default' : 'outline'} onClick={() => setSideOverride('buy')} className="flex-1">Buy</Button>
+          <Button type="button" data-active={side === 'sell'} variant={side === 'sell' ? 'default' : 'outline'} onClick={() => setSideOverride('sell')} className="flex-1">Sell</Button>
         </div>
 
         <Select
           value={connectionId}
-          onValueChange={setConnectionId}
+          onValueChange={setChosenConn}
           placeholder="Broker connection"
           options={connected.map((c) => ({ value: c.id, label: `${c.name} (${c.broker_id})` }))}
         />
@@ -142,7 +125,7 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 text-xs text-muted">
             Quantity
-            <Input aria-label="quantity" type="number" min="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <Input aria-label="quantity" type="number" min="0" value={quantity} onChange={(e) => setQtyOverride(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">
             Order type
@@ -156,11 +139,11 @@ export function TradeTicket({ symbol, signal, currentPrice, armed = false }: {
           )}
           <label className="flex flex-col gap-1 text-xs text-muted">
             Stop loss
-            <Input aria-label="stop loss" type="number" step="any" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} />
+            <Input aria-label="stop loss" type="number" step="any" value={stopLoss} onChange={(e) => setStopLossOverride(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">
             Take profit
-            <Input aria-label="take profit" type="number" step="any" value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} />
+            <Input aria-label="take profit" type="number" step="any" value={takeProfit} onChange={(e) => setTakeProfitOverride(e.target.value)} />
           </label>
         </div>
 

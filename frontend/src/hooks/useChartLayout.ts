@@ -13,16 +13,11 @@ export function useChartLayout() {
     staleTime: 5 * 60_000,
   })
 
-  const [layout, setLayoutState] = useState<IndicatorConfig[]>(DEFAULT_LAYOUT)
-  const loadedRef = useRef(false)
+  const [override, setOverride] = useState<IndicatorConfig[] | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    if (loadedRef.current || !me.data) return
-    loadedRef.current = true
-    const saved = me.data.user.preferences?.chart_layout
-    if (Array.isArray(saved)) setLayoutState(saved)
-  }, [me.data])
+  const savedFromQuery = me.data?.user.preferences?.chart_layout
+  const layout = override ?? (Array.isArray(savedFromQuery) ? savedFromQuery : DEFAULT_LAYOUT)
 
   useEffect(() => {
     return () => {
@@ -31,7 +26,7 @@ export function useChartLayout() {
   }, [])
 
   const setLayout = (next: IndicatorConfig[]) => {
-    setLayoutState(next)
+    setOverride(next)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       // Preferences is a single jsonb column replaced wholesale on PUT, so we

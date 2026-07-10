@@ -42,18 +42,20 @@ export function SymbolAnalysisPage() {
     queryKey: ['analysis-signal', symbol, signalId],
     queryFn: async () => {
       try {
-        if (signalId) return (await api.get<{ signal: Signal }>(`/analysis/signals/${signalId}`)).data.signal
-        const res = await api.get<{ signal: Signal }>(`/analysis/latest/${symbol}`)
-        return res.data.signal
+        const signal = signalId
+          ? (await api.get<{ signal: Signal }>(`/analysis/signals/${signalId}`)).data.signal
+          : (await api.get<{ signal: Signal }>(`/analysis/latest/${symbol}`)).data.signal
+        return { signal, fetchedAt: Date.now() }
       } catch (err) {
-        if ((err as ApiErrorLike)?.response?.status === 404) return null
+        if ((err as ApiErrorLike)?.response?.status === 404) return { signal: null, fetchedAt: Date.now() }
         throw err
       }
     },
     retry: false,
   })
-  const signal = signalQuery.data ?? null
-  const expired = Boolean(signal?.expires_at && new Date(signal.expires_at).getTime() < Date.now())
+  const signal = signalQuery.data?.signal ?? null
+  const fetchedAt = signalQuery.data?.fetchedAt ?? 0
+  const expired = signal?.expires_at ? new Date(signal.expires_at).getTime() < fetchedAt : false
 
   const { layout, setLayout } = useChartLayout()
 

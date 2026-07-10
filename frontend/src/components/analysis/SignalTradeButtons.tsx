@@ -23,14 +23,14 @@ export function SignalTradeButtons({ signal }: { signal: Signal }) {
   const go = () => navigate(`/analyze/${signal.symbol}?signal=${signal.id}&arm=1`)
 
   const fire = async (side: 'buy' | 'sell') => {
-    const me = await queryClient.fetchQuery({
-      queryKey: ['me'],
-      queryFn: async () => (await api.get<{ user: { preferences?: { trading?: { instant_orders?: boolean } } } }>('/users/me')).data,
-      staleTime: 60_000,
-    })
-    const instant = Boolean(me?.user?.preferences?.trading?.instant_orders)
-    if (!instant) return go()
     try {
+      const me = await queryClient.fetchQuery({
+        queryKey: ['me'],
+        queryFn: async () => (await api.get<{ user: { preferences?: { trading?: { instant_orders?: boolean } } } }>('/users/me')).data,
+        staleTime: 60_000,
+      })
+      const instant = Boolean(me?.user?.preferences?.trading?.instant_orders)
+      if (!instant) return go()
       const connections = (await api.get<{ connections: BrokerConnection[] }>('/brokers/connections')).data.connections
       const conn = connections.find((c) => c.status === 'connected')
       if (!conn) throw new Error('No connected broker')

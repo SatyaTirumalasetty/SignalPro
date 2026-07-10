@@ -179,4 +179,25 @@ describe('SignalsPage', () => {
     )
     expect(mockNavigate).not.toHaveBeenCalled()
   })
+
+  test('instant-flag fetch failure surfaces a toast and places no order', async () => {
+    ;(api.get as Mock).mockImplementation((url: string) => {
+      if (url === '/users/me') {
+        return Promise.reject(new Error('Network error'))
+      }
+      if (url === '/analysis/signals') return Promise.resolve({ data: { signals } })
+      return Promise.resolve({ data: {} })
+    })
+    ;(api.post as Mock).mockResolvedValue({ data: { order: { id: 'order-9' } } })
+    renderPage()
+
+    const buy = (await screen.findAllByRole('button', { name: /^buy$/i }))[0]
+    fireEvent.click(buy)
+
+    await waitFor(() =>
+      expect(toastFn).toHaveBeenCalledWith('Network error', 'error'),
+    )
+    expect(api.post).not.toHaveBeenCalled()
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
 })

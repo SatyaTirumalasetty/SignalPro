@@ -9,6 +9,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PlaceOrderDialog } from '@/components/trading/PlaceOrderDialog'
+import { SignalTradeButtons } from '@/components/analysis/SignalTradeButtons'
 import { useToast } from '@/hooks/useToast'
 import { api, getApiErrorMessage } from '@/lib/api'
 import { formatCurrency, formatDate, formatPercent, signalBadgeVariant } from '@/lib/format'
@@ -115,7 +116,11 @@ export function SignalsPage() {
               <TableBody>
                 {signalsQuery.data.map((signal) => (
                   <TableRow key={signal.id}>
-                    <TableCell className="font-medium text-foreground">{signal.symbol}</TableCell>
+                    <TableCell className="font-medium text-foreground">
+                      <Link to={`/analyze/${signal.symbol}?signal=${signal.id}`} className="hover:underline">
+                        {signal.symbol}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={signalBadgeVariant(signal.signal_type)}>{signal.signal_type}</Badge>
                     </TableCell>
@@ -124,7 +129,7 @@ export function SignalsPage() {
                     <TableCell>{formatCurrency(signal.take_profit)}</TableCell>
                     <TableCell className="text-muted">{formatDate(signal.created_at)}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button size="sm" variant="outline" onClick={() => setActiveSignal(signal)}>
                           Details
                         </Button>
@@ -133,6 +138,7 @@ export function SignalsPage() {
                             Execute
                           </Button>
                         )}
+                        <SignalTradeButtons signal={signal} />
                       </div>
                     </TableCell>
                   </TableRow>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -7,10 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import { PriceChart } from '@/components/PriceChart'
 import { api } from '@/lib/api'
 import { useLivePrices } from '@/hooks/useWebSocket'
+import { prefetchCandles } from '@/hooks/useCandles'
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
 import type { MarketSnapshot, SearchResult } from '@/types/api'
 
 export function MarketPage() {
+  const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [symbol, setSymbol] = useState('AAPL')
 
@@ -72,7 +75,15 @@ export function MarketPage() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle>{symbol}</CardTitle>
+            <CardTitle>
+              <Link
+                to={`/analyze/${symbol}`}
+                onMouseEnter={() => prefetchCandles(queryClient, symbol)}
+                className="hover:underline"
+              >
+                {symbol}
+              </Link>
+            </CardTitle>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-semibold text-foreground">{formatCurrency(price)}</span>
               {changePercent !== undefined && changePercent !== null && (

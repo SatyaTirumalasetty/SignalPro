@@ -3,6 +3,7 @@ import { HealthStrip } from '@/components/engine/HealthStrip'
 import { PerformancePanel } from '@/components/engine/PerformancePanel'
 import { DecisionBreakdownPanel } from '@/components/engine/DecisionBreakdownPanel'
 import { SymbolPerformanceTable } from '@/components/engine/SymbolPerformanceTable'
+import { ActivityFeed } from '@/components/engine/ActivityFeed'
 
 export function EngineDashboardPage() {
   return (
@@ -20,6 +21,7 @@ export function EngineDashboardPage() {
       <PerformancePanel />
       <DecisionBreakdownPanel />
       <SymbolPerformanceTable />
+      <ActivityFeed />
     </div>
   )
 }

@@ -37,7 +37,8 @@ describe('WatchlistPage', () => {
     renderPage()
     expect(await screen.findByText('AAPL')).toBeInTheDocument()
     expect(screen.getByText('Apple')).toBeInTheDocument()
-    expect(screen.getByText('$205.05')).toBeInTheDocument()
+    // Prices resolve one tick after symbols, so await this assertion too.
+    expect(await screen.findByText('$205.05')).toBeInTheDocument()
     expect(screen.getByText('+1.20%')).toBeInTheDocument()
     expect(screen.getByText('MSFT')).toBeInTheDocument()
     expect(screen.getByText('-0.30%')).toBeInTheDocument()

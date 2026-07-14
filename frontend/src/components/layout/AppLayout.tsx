@@ -18,6 +18,7 @@ import {
   Activity,
   Menu,
   ChevronDown,
+  Heart,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ const navItems = [
   { to: '/auto-trading/dashboard', label: 'Engine Dashboard', icon: Activity },
   { to: '/portfolio', label: 'Portfolio', icon: BarChart3 },
   { to: '/market', label: 'Market', icon: LineChart },
+  { to: '/watchlist', label: 'Watchlist', icon: Heart },
   { to: '/signals', label: 'Signals', icon: Sparkles },
   { to: '/brokers', label: 'Brokers', icon: Plug },
   { to: '/billing', label: 'Billing', icon: CreditCard },

@@ -512,3 +512,15 @@ export interface EngineGuardrailTrips {
   trips: { action: string; count: number }[]
   total_runs: number; min_required: number; sufficient: boolean
 }
+
+export interface WatchlistResponse {
+  symbols: string[]
+}
+export interface SymbolPrice {
+  symbol: string
+  price: number
+  change_percent: number
+}
+export interface MarketPricesResponse {
+  prices: SymbolPrice[]
+}

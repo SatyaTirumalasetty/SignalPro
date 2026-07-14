@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -6,8 +6,14 @@ import { describe, test, expect, vi, beforeEach, type Mock } from 'vitest'
 import { WatchlistPage } from './WatchlistPage'
 import { api } from '@/lib/api'
 
-vi.mock('@/lib/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
+vi.mock('@/lib/api', () => ({
+  api: { get: vi.fn(), put: vi.fn() },
+  getApiErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'Unexpected error'),
+}))
 vi.mock('@/hooks/useWebSocket', () => ({ useLivePrices: () => ({}) }))
+
+const toastFn = vi.fn()
+vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ toast: toastFn }) }))
 
 function mockGet(symbols = ['AAPL', 'MSFT']) {
   ;(api.get as Mock).mockImplementation((url: string) => {
@@ -75,5 +81,17 @@ describe('WatchlistPage', () => {
     mockGet([])
     renderPage()
     expect(await screen.findByText(/your watchlist is empty/i)).toBeInTheDocument()
+  })
+
+  test('a failed toggle rolls back and shows an error toast', async () => {
+    mockGet(['AAPL', 'MSFT'])
+    ;(api.put as Mock).mockRejectedValue(new Error('network'))
+    renderPage()
+    const user = userEvent.setup()
+    await screen.findByText('AAPL')
+    await user.click(screen.getByLabelText('Remove AAPL'))
+    await waitFor(() => expect(toastFn).toHaveBeenCalledWith(expect.any(String), 'error'))
+    // rolled back: AAPL still present
+    expect(screen.getByText('AAPL')).toBeInTheDocument()
   })
 })

@@ -299,4 +299,18 @@ router.get('/calibration', authenticate, asyncHandler(async (req, res) => {
   });
 }));
 
+// ── GET /api/auto-trading/guardrail-trips ────────────────────────────────────
+
+const GUARDRAIL_MIN_REQUIRED = 20;
+
+router.get('/guardrail-trips', authenticate, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const trips = await db.manyOrNone(
+    `SELECT action, COUNT(*)::int AS count FROM auto_trading_runs
+       WHERE user_id = $1 AND action LIKE 'skipped_%' GROUP BY action ORDER BY count DESC`, [userId]);
+  const total = await db.one(`SELECT COUNT(*) FROM auto_trading_runs WHERE user_id = $1`, [userId]);
+  const totalRuns = parseInt(total.count, 10);
+  res.json({ trips, total_runs: totalRuns, min_required: GUARDRAIL_MIN_REQUIRED, sufficient: totalRuns >= GUARDRAIL_MIN_REQUIRED });
+}));
+
 module.exports = router;

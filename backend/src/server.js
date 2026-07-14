@@ -30,6 +30,7 @@ const subscriptionRoutes = require('./routes/subscriptions');
 const adminRoutes = require('./routes/admin');
 const backtestRoutes = require('./routes/backtest');
 const autoTradingRoutes = require('./routes/autoTrading');
+const watchlistRoutes = require('./routes/watchlist');
 
 const app = express();
 const server = http.createServer(app);
@@ -82,6 +83,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/backtest', backtestRoutes);
 app.use('/api/auto-trading', autoTradingRoutes);
+app.use('/api/watchlist', watchlistRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((req, res) => {

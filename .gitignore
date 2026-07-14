@@ -32,3 +32,6 @@ coverage/
 
 # Claude Code internal
 .claude/
+
+# Superpowers brainstorming companion
+.superpowers/

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Search, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -32,16 +32,15 @@ export function WatchlistPage() {
     queryFn: async () => (await api.get<MarketPricesResponse>('/market/prices', { params: { symbols: symbols.join(',') } })).data.prices,
     enabled: symbols.length > 0,
     refetchInterval: 60_000,
+    // Keep the previous batch while a new query key (symbols list changed via
+    // toggle) is in flight, so rows don't flash to "—" on every heart click.
+    placeholderData: keepPreviousData,
   })
   const priceMap = useMemo(
     () => new Map((pricesQuery.data ?? []).map((p) => [p.symbol, p])),
     [pricesQuery.data],
   )
   const live = useLivePrices(symbols)
-  // Wait for prices to settle before rendering rows so the symbol and its
-  // price land in the same paint — avoids a "—" placeholder flash. Falls
-  // through on error too, so a failed price fetch doesn't block the list.
-  const rowsReady = symbols.length === 0 || pricesQuery.isSuccess || pricesQuery.isError
 
   const toggle = (sym: string) => {
     const next = symbols.includes(sym) ? symbols.filter((s) => s !== sym) : [...symbols, sym]
@@ -79,10 +78,7 @@ export function WatchlistPage() {
           {symbols.length === 0 && (
             <p className="p-4 text-sm text-muted">Your watchlist is empty. Search above and tap the heart to add a stock.</p>
           )}
-          {symbols.length > 0 && !rowsReady && (
-            <p className="p-4 text-sm text-muted">Loading prices…</p>
-          )}
-          {rowsReady && symbols.map((sym) => {
+          {symbols.length > 0 && symbols.map((sym) => {
             const p = priceMap.get(sym)
             const price = live[sym]?.price ?? p?.price
             const change = live[sym]?.change_percent ?? p?.change_percent

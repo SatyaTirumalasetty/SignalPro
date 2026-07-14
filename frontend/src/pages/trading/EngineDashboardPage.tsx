@@ -5,6 +5,7 @@ import { DecisionBreakdownPanel } from '@/components/engine/DecisionBreakdownPan
 import { SymbolPerformanceTable } from '@/components/engine/SymbolPerformanceTable'
 import { ActivityFeed } from '@/components/engine/ActivityFeed'
 import { CalibrationPanel } from '@/components/engine/CalibrationPanel'
+import { GuardrailTripsPanel } from '@/components/engine/GuardrailTripsPanel'
 
 export function EngineDashboardPage() {
   return (
@@ -24,6 +25,7 @@ export function EngineDashboardPage() {
       <SymbolPerformanceTable />
       <ActivityFeed />
       <CalibrationPanel />
+      <GuardrailTripsPanel />
     </div>
   )
 }

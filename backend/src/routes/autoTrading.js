@@ -261,4 +261,42 @@ router.get('/symbol-performance', authenticate, asyncHandler(async (req, res) =>
   res.json({ symbols });
 }));
 
+// ── GET /api/auto-trading/calibration ─────────────────────────────────────────
+// Entry confidence = most recent order_placed run for the symbol at/before open.
+
+const CALIBRATION_MIN_REQUIRED = 10;
+const CALIBRATION_BUCKETS = [
+  { range: '<50', lo: -Infinity, hi: 50 },
+  { range: '50-60', lo: 50, hi: 60 },
+  { range: '60-70', lo: 60, hi: 70 },
+  { range: '70-80', lo: 70, hi: 80 },
+  { range: '80-90', lo: 80, hi: 90 },
+  { range: '90-100', lo: 90, hi: Infinity },
+];
+
+router.get('/calibration', authenticate, asyncHandler(async (req, res) => {
+  const rows = await db.manyOrNone(
+    `SELECT p.pnl,
+        (SELECT r.confidence FROM auto_trading_runs r
+           WHERE r.user_id = p.user_id AND r.symbol = p.symbol AND r.action = 'order_placed'
+             AND r.confidence IS NOT NULL AND r.created_at <= p.opened_at
+           ORDER BY r.created_at DESC LIMIT 1) AS entry_confidence
+       FROM positions p WHERE p.user_id = $1 AND p.status = 'closed'`, [req.user.id]);
+
+  const scored = rows.filter((r) => r.entry_confidence != null)
+    .map((r) => ({ conf: parseFloat(r.entry_confidence), win: parseFloat(r.pnl) > 0 }));
+
+  const buckets = CALIBRATION_BUCKETS.map((b) => {
+    const inBucket = scored.filter((s) => s.conf >= b.lo && s.conf < b.hi);
+    return { range: b.range, trades: inBucket.length, win_rate: inBucket.length > 0 ? inBucket.filter((s) => s.win).length / inBucket.length : 0 };
+  }).filter((b) => b.trades > 0);
+
+  res.json({
+    buckets,
+    total_closed: scored.length,
+    min_required: CALIBRATION_MIN_REQUIRED,
+    sufficient: scored.length >= CALIBRATION_MIN_REQUIRED,
+  });
+}));
+
 module.exports = router;

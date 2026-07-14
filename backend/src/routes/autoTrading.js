@@ -86,19 +86,30 @@ router.put('/settings', authenticate, [
 router.get('/activity', authenticate, [
   query('limit').optional().isInt({ min: 1, max: 200 }),
   query('offset').optional().isInt({ min: 0 }),
+  query('symbol').optional().trim().toUpperCase().isLength({ min: 1, max: 20 }),
+  query('action').optional().trim().isLength({ min: 1, max: 30 }),
+  query('from').optional().isISO8601(),
+  query('to').optional().isISO8601(),
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { limit = 50, offset = 0 } = req.query;
+  const { limit = 50, offset = 0, symbol, action, from, to } = req.query;
 
+  const conditions = ['user_id = $1'];
+  const params = [req.user.id];
+  if (symbol) { params.push(symbol); conditions.push(`symbol = $${params.length}`); }
+  if (action) { params.push(action); conditions.push(`action = $${params.length}`); }
+  if (from) { params.push(from); conditions.push(`created_at >= $${params.length}`); }
+  if (to) { params.push(to); conditions.push(`created_at <= $${params.length}`); }
+  const where = conditions.join(' AND ');
+
+  const listParams = [...params, parseInt(limit), parseInt(offset)];
   const runs = await db.manyOrNone(
     `SELECT id, symbol, timeframe, decision, confidence, action, signal_id, order_id, reasoning, error_message, action_detail, created_at
-     FROM auto_trading_runs WHERE user_id = $1
-     ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-    [req.user.id, parseInt(limit), parseInt(offset)]
-  );
-  const { count } = await db.one('SELECT COUNT(*) FROM auto_trading_runs WHERE user_id = $1', [req.user.id]);
+       FROM auto_trading_runs WHERE ${where}
+       ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, listParams);
+  const { count } = await db.one(`SELECT COUNT(*) FROM auto_trading_runs WHERE ${where}`, params);
 
   res.json({ runs, total: parseInt(count), limit: parseInt(limit), offset: parseInt(offset) });
 }));

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { HealthStrip } from '@/components/engine/HealthStrip'
 import { PerformancePanel } from '@/components/engine/PerformancePanel'
+import { DecisionBreakdownPanel } from '@/components/engine/DecisionBreakdownPanel'
 
 export function EngineDashboardPage() {
   return (
@@ -16,6 +17,7 @@ export function EngineDashboardPage() {
       </div>
       <HealthStrip />
       <PerformancePanel />
+      <DecisionBreakdownPanel />
     </div>
   )
 }

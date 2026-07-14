@@ -3,7 +3,7 @@ const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { getAutoTradingSettings } = require('../services/autoTradingEngine');
+const { getAutoTradingSettings, CIRCUIT_BREAKER_ERROR_THRESHOLD } = require('../services/autoTradingEngine');
 const { AI_MODE_NAMES } = require('../services/aiModes');
 
 const router = express.Router();
@@ -156,6 +156,66 @@ router.get('/benchmark', authenticate, asyncHandler(async (req, res) => {
       engine_equity: parseFloat(r.engine_equity),
       watchlist_value: parseFloat(r.watchlist_value),
     })),
+  });
+}));
+
+// ── GET /api/auto-trading/metrics ─────────────────────────────────────────────
+// Read-only rollup: health strip + performance KPIs + decision breakdown.
+
+router.get('/metrics', authenticate, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const ATTRIBUTED = `SELECT DISTINCT symbol FROM auto_trading_runs WHERE user_id = $1 AND action = 'order_placed'`;
+
+  const user = await db.one('SELECT preferences FROM users WHERE id = $1', [userId]);
+  const settings = getAutoTradingSettings(user.preferences);
+
+  const lastRun = await db.oneOrNone(
+    `SELECT created_at FROM auto_trading_runs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [userId]);
+  const errors = await db.one(
+    `SELECT COUNT(*) FROM auto_trading_runs WHERE user_id = $1 AND action IN ('error','needs_attention','auto_disabled_errors') AND created_at >= NOW() - INTERVAL '24 hours'`, [userId]);
+  const tradesToday = await db.one(
+    `SELECT COUNT(*) FROM auto_trading_runs WHERE user_id = $1 AND action = 'order_placed' AND created_at >= CURRENT_DATE`, [userId]);
+  const tradesTotal = await db.one(
+    `SELECT COUNT(*) FROM auto_trading_runs WHERE user_id = $1 AND action = 'order_placed'`, [userId]);
+  const avgConf = await db.one(
+    `SELECT AVG(confidence) AS avg FROM auto_trading_runs WHERE user_id = $1 AND confidence IS NOT NULL`, [userId]);
+  const breakdown = await db.manyOrNone(
+    `SELECT action, COUNT(*)::int AS count FROM auto_trading_runs WHERE user_id = $1 GROUP BY action ORDER BY count DESC`, [userId]);
+  const wl = await db.one(
+    `SELECT COUNT(*) FILTER (WHERE pnl > 0)::int AS wins, COUNT(*)::int AS total
+       FROM positions WHERE user_id = $1 AND status = 'closed' AND symbol IN (${ATTRIBUTED})`, [userId]);
+  const snaps = await db.manyOrNone(
+    `SELECT engine_equity, watchlist_value FROM benchmark_snapshots WHERE user_id = $1 ORDER BY snapshot_date ASC`, [userId]);
+
+  let returnPct = null;
+  let vsBuyHoldPct = null;
+  if (snaps.length >= 2) {
+    const first = snaps[0];
+    const last = snaps[snaps.length - 1];
+    const e0 = parseFloat(first.engine_equity);
+    const e1 = parseFloat(last.engine_equity);
+    const w0 = parseFloat(first.watchlist_value);
+    const w1 = parseFloat(last.watchlist_value);
+    if (e0 > 0) returnPct = ((e1 - e0) / e0) * 100;
+    if (e0 > 0 && w0 > 0) vsBuyHoldPct = returnPct - ((w1 - w0) / w0) * 100;
+  }
+
+  res.json({
+    health: {
+      enabled: settings.enabled,
+      last_run_at: lastRun?.created_at || null,
+      errors_24h: parseInt(errors.count, 10),
+      circuit_breaker_threshold: CIRCUIT_BREAKER_ERROR_THRESHOLD,
+      trades_today: parseInt(tradesToday.count, 10),
+    },
+    performance: {
+      return_pct: returnPct,
+      vs_buy_hold_pct: vsBuyHoldPct,
+      win_rate: parseInt(wl.total, 10) > 0 ? parseInt(wl.wins, 10) / parseInt(wl.total, 10) : null,
+      trades: parseInt(tradesTotal.count, 10),
+    },
+    decision_breakdown: breakdown,
+    avg_confidence: avgConf.avg != null ? parseFloat(avgConf.avg) : null,
   });
 }));
 

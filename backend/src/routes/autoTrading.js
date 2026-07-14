@@ -219,4 +219,46 @@ router.get('/metrics', authenticate, asyncHandler(async (req, res) => {
   });
 }));
 
+// ── GET /api/auto-trading/symbol-performance ──────────────────────────────────
+
+router.get('/symbol-performance', authenticate, asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const runRows = await db.manyOrNone(
+    `SELECT symbol,
+        COUNT(*) FILTER (WHERE action = 'order_placed')::int AS trades,
+        AVG(confidence) AS avg_confidence,
+        (ARRAY_AGG(action ORDER BY created_at DESC))[1] AS last_action,
+        MAX(created_at) AS last_action_at
+       FROM auto_trading_runs WHERE user_id = $1 GROUP BY symbol`, [userId]);
+
+  const posRows = await db.manyOrNone(
+    `SELECT symbol,
+        COALESCE(SUM(pnl) FILTER (WHERE status = 'closed'), 0) AS realized_pnl,
+        COALESCE(SUM(pnl) FILTER (WHERE status = 'open'), 0) AS unrealized_pnl,
+        COUNT(*) FILTER (WHERE status = 'closed' AND pnl > 0)::int AS wins,
+        COUNT(*) FILTER (WHERE status = 'closed')::int AS closed
+       FROM positions WHERE user_id = $1 GROUP BY symbol`, [userId]);
+
+  const pnlBySymbol = new Map(posRows.map((r) => [r.symbol, r]));
+
+  const symbols = runRows.map((r) => {
+    const p = pnlBySymbol.get(r.symbol);
+    const closed = p ? parseInt(p.closed, 10) : 0;
+    const wins = p ? parseInt(p.wins, 10) : 0;
+    return {
+      symbol: r.symbol,
+      trades: r.trades,
+      win_rate: closed > 0 ? wins / closed : null,
+      realized_pnl: p ? parseFloat(p.realized_pnl) : 0,
+      unrealized_pnl: p ? parseFloat(p.unrealized_pnl) : 0,
+      avg_confidence: r.avg_confidence != null ? parseFloat(r.avg_confidence) : null,
+      last_action: r.last_action,
+      last_action_at: r.last_action_at,
+    };
+  }).sort((a, b) => b.trades - a.trades || a.symbol.localeCompare(b.symbol));
+
+  res.json({ symbols });
+}));
+
 module.exports = router;

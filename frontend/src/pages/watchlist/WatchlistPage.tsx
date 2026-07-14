@@ -5,8 +5,9 @@ import { Search, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { api } from '@/lib/api'
+import { api, getApiErrorMessage } from '@/lib/api'
 import { useLivePrices } from '@/hooks/useWebSocket'
+import { useToast } from '@/hooks/useToast'
 import { formatCurrency } from '@/lib/format'
 import { SYMBOL_NAMES } from '@/lib/watchlist'
 import { useWatchlist, useWatchlistMutation } from '@/hooks/useWatchlist'
@@ -19,6 +20,7 @@ const changePct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 export function WatchlistPage() {
   const { data: symbols = [] } = useWatchlist()
   const mutation = useWatchlistMutation()
+  const { toast } = useToast()
   const [query, setQuery] = useState('')
 
   const search = useQuery({
@@ -44,7 +46,7 @@ export function WatchlistPage() {
 
   const toggle = (sym: string) => {
     const next = symbols.includes(sym) ? symbols.filter((s) => s !== sym) : [...symbols, sym]
-    mutation.mutate(next)
+    mutation.mutate(next, { onError: (err) => toast(getApiErrorMessage(err), 'error') })
   }
 
   return (
@@ -78,7 +80,7 @@ export function WatchlistPage() {
           {symbols.length === 0 && (
             <p className="p-4 text-sm text-muted">Your watchlist is empty. Search above and tap the heart to add a stock.</p>
           )}
-          {symbols.length > 0 && symbols.map((sym) => {
+          {symbols.map((sym) => {
             const p = priceMap.get(sym)
             const price = live[sym]?.price ?? p?.price
             const change = live[sym]?.change_percent ?? p?.change_percent

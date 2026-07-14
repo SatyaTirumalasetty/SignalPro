@@ -469,3 +469,15 @@ export interface AutoTradingStatus {
   trades_today: number
   todays_pnl: number
 }
+
+export interface WatchlistResponse {
+  symbols: string[]
+}
+export interface SymbolPrice {
+  symbol: string
+  price: number
+  change_percent: number
+}
+export interface MarketPricesResponse {
+  prices: SymbolPrice[]
+}

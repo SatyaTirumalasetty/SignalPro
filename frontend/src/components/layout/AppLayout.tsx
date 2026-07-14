@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   LogOut,
   Bot,
+  Activity,
   Menu,
   ChevronDown,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ const navItems = [
   { to: '/trading/positions', label: 'Positions', icon: Briefcase },
   { to: '/trading/backtest', label: 'Backtest', icon: FlaskConical },
   { to: '/auto-trading', label: 'Auto Trading', icon: Bot },
+  { to: '/auto-trading/dashboard', label: 'Engine Dashboard', icon: Activity },
   { to: '/portfolio', label: 'Portfolio', icon: BarChart3 },
   { to: '/market', label: 'Market', icon: LineChart },
   { to: '/signals', label: 'Signals', icon: Sparkles },

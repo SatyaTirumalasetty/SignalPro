@@ -490,3 +490,25 @@ export interface AutoTradingStatus {
   trades_today: number
   todays_pnl: number
 }
+
+export interface EngineMetrics {
+  health: { enabled: boolean; last_run_at: string | null; errors_24h: number; circuit_breaker_threshold: number; trades_today: number }
+  performance: { return_pct: number | null; vs_buy_hold_pct: number | null; win_rate: number | null; trades: number }
+  decision_breakdown: { action: string; count: number }[]
+  avg_confidence: number | null
+}
+
+export interface EngineSymbolPerformanceRow {
+  symbol: string; trades: number; win_rate: number | null; realized_pnl: number
+  unrealized_pnl: number; avg_confidence: number | null; last_action: string | null; last_action_at: string | null
+}
+
+export interface EngineCalibration {
+  buckets: { range: string; trades: number; win_rate: number }[]
+  total_closed: number; min_required: number; sufficient: boolean
+}
+
+export interface EngineGuardrailTrips {
+  trips: { action: string; count: number }[]
+  total_runs: number; min_required: number; sufficient: boolean
+}

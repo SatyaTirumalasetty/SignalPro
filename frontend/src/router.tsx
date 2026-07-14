@@ -16,6 +16,7 @@ import { PositionsPage } from '@/pages/trading/PositionsPage'
 import { PortfolioPage } from '@/pages/trading/PortfolioPage'
 import { BacktestPage } from '@/pages/trading/BacktestPage'
 import { AutoTradingPage } from '@/pages/trading/AutoTradingPage'
+import { EngineDashboardPage } from '@/pages/trading/EngineDashboardPage'
 import { MarketPage } from '@/pages/market/MarketPage'
 import { SymbolAnalysisPage } from '@/pages/analysis/SymbolAnalysisPage'
 import { SignalsPage } from '@/pages/signals/SignalsPage'
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
           { path: '/trading/positions', element: <PositionsPage /> },
           { path: '/trading/backtest', element: <BacktestPage /> },
           { path: '/auto-trading', element: <AutoTradingPage /> },
+          { path: '/auto-trading/dashboard', element: <EngineDashboardPage /> },
           { path: '/portfolio', element: <PortfolioPage /> },
           { path: '/market', element: <MarketPage /> },
           { path: '/analyze/:symbol', element: <SymbolAnalysisPage /> },

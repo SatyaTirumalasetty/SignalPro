@@ -81,6 +81,17 @@ describe('AnalysisChart', () => {
     expect(prices).toEqual(expect.arrayContaining([150, 145, 160]))
   })
 
+  test('coerces string-typed signal prices to numbers (API serializes numerics as strings)', () => {
+    const stringSignal = { ...signal, entry_price: '150.5', stop_loss: '145.25', take_profit: '160.75' } as unknown as Signal
+    render(<AnalysisChart candles={candles} indicators={[]} signal={stringSignal} />)
+    expect(createPriceLine).toHaveBeenCalledTimes(3)
+    for (const call of createPriceLine.mock.calls) {
+      expect(typeof call[0].price).toBe('number')
+    }
+    const prices = createPriceLine.mock.calls.map((c) => c[0].price)
+    expect(prices).toEqual(expect.arrayContaining([150.5, 145.25, 160.75]))
+  })
+
   test('showSignal=false draws no price lines', () => {
     render(<AnalysisChart candles={candles} indicators={[]} signal={signal} showSignal={false} />)
     expect(createPriceLine).not.toHaveBeenCalled()

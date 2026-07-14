@@ -118,7 +118,11 @@ export function AnalysisChart({ candles, indicators, signal, showSignal = true, 
       ]
       for (const l of lines) {
         if (l.price == null) continue
-        price.createPriceLine({ price: l.price, color: l.color, lineStyle: l.style, lineWidth: 1, axisLabelVisible: true, title: l.title })
+        // The API serializes numeric columns as strings; lightweight-charts
+        // asserts price must be a number, so coerce and skip non-finite values.
+        const p = Number(l.price)
+        if (!Number.isFinite(p)) continue
+        price.createPriceLine({ price: p, color: l.color, lineStyle: l.style, lineWidth: 1, axisLabelVisible: true, title: l.title })
       }
     }
 

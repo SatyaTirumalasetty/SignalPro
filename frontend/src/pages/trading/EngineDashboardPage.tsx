@@ -4,6 +4,7 @@ import { PerformancePanel } from '@/components/engine/PerformancePanel'
 import { DecisionBreakdownPanel } from '@/components/engine/DecisionBreakdownPanel'
 import { SymbolPerformanceTable } from '@/components/engine/SymbolPerformanceTable'
 import { ActivityFeed } from '@/components/engine/ActivityFeed'
+import { CalibrationPanel } from '@/components/engine/CalibrationPanel'
 
 export function EngineDashboardPage() {
   return (
@@ -22,6 +23,7 @@ export function EngineDashboardPage() {
       <DecisionBreakdownPanel />
       <SymbolPerformanceTable />
       <ActivityFeed />
+      <CalibrationPanel />
     </div>
   )
 }

@@ -38,8 +38,19 @@ const wss = new WebSocket.Server({ server });
 // ─── Security & Middleware ────────────────────────────────────
 app.use(helmet(helmetOptions));
 
+// CORS allowlist. Kept separate from FRONTEND_URL, which is a single base URL
+// used to build email and OAuth-redirect links — a comma-separated value there
+// would corrupt those. Set CORS_ORIGINS (comma-separated) to allow more than one
+// origin; otherwise fall back to FRONTEND_URL, then Vite's dev ports. Vite hops
+// 5173 → 5174 → 5175 when a port is taken, so dev logins need all three allowed.
+const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: corsOrigins.length ? corsOrigins : devOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],

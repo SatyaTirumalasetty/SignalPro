@@ -15,16 +15,19 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
   return (
     <RadixDialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <RadixDialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 shadow-xl outline-none',
+            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-elevated p-5 shadow-2xl shadow-black/50 outline-none',
             className,
           )}
         >
           <div className="mb-4 flex items-center justify-between">
             <RadixDialog.Title className="text-base font-semibold text-foreground">{title}</RadixDialog.Title>
-            <RadixDialog.Close className="text-muted hover:text-foreground cursor-pointer">
+            <RadixDialog.Close
+              aria-label="Close"
+              className="-mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-card hover:text-foreground cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <X size={18} />
             </RadixDialog.Close>
           </div>

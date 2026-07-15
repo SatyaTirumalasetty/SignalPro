@@ -21,7 +21,9 @@ export function Select({ value, onValueChange, options, placeholder, className, 
     <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <RadixSelect.Trigger
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50',
+          'flex h-10 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground',
+          'outline-none transition-colors cursor-pointer touch-manipulation hover:border-muted/40',
+          'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
       >
@@ -34,7 +36,7 @@ export function Select({ value, onValueChange, options, placeholder, className, 
         <RadixSelect.Content
           position="popper"
           sideOffset={4}
-          className="z-50 max-h-72 w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-border bg-card shadow-lg"
+          className="z-50 max-h-72 w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-border bg-elevated shadow-lg shadow-black/40"
         >
           <RadixSelect.Viewport className="p-1">
             {options.map((opt) => (

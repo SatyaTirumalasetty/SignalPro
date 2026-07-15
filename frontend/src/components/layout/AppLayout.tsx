@@ -45,39 +45,50 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors outline-none',
+    'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+    isActive ? 'bg-primary/15 text-primary font-medium' : 'text-muted hover:bg-elevated hover:text-foreground',
+  )
+
+// Active items carry a thin violet rail on the left edge — a quiet, consistent
+// "you are here" marker that suits a data instrument.
+function ActiveRail({ active }: { active: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-opacity',
+        active ? 'opacity-100' : 'opacity-0',
+      )}
+    />
+  )
+}
+
 function NavLinks({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: () => void }) {
   return (
     <nav className="flex flex-1 flex-col gap-1">
       {navItems.map(({ to, label, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-              isActive ? 'bg-primary/15 text-primary' : 'text-muted hover:bg-card hover:text-foreground',
-            )
-          }
-        >
-          <Icon size={18} />
-          {label}
+        <NavLink key={to} to={to} end={end} onClick={onNavigate} className={navLinkClass}>
+          {({ isActive }) => (
+            <>
+              <ActiveRail active={isActive} />
+              <Icon size={18} />
+              {label}
+            </>
+          )}
         </NavLink>
       ))}
       {isAdmin && (
-        <NavLink
-          to="/admin"
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-              isActive ? 'bg-primary/15 text-primary' : 'text-muted hover:bg-card hover:text-foreground',
-            )
-          }
-        >
-          <ShieldCheck size={18} />
-          Admin
+        <NavLink to="/admin" onClick={onNavigate} className={navLinkClass}>
+          {({ isActive }) => (
+            <>
+              <ActiveRail active={isActive} />
+              <ShieldCheck size={18} />
+              Admin
+            </>
+          )}
         </NavLink>
       )}
     </nav>

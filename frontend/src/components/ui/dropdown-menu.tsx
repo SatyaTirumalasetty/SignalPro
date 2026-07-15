@@ -11,7 +11,7 @@ export function DropdownMenuContent({ className, ...props }: RadixDropdown.Dropd
         sideOffset={6}
         align="end"
         className={cn(
-          'z-50 min-w-[10rem] rounded-md border border-border bg-card p-1 shadow-lg',
+          'z-50 min-w-[10rem] rounded-md border border-border bg-elevated p-1 shadow-lg shadow-black/40',
           className,
         )}
         {...props}

@@ -13,7 +13,7 @@ const WATCHLIST_SEED = [
   'UNH', 'XOM', 'JNJ', 'WMT', 'MA', 'PG', 'HD', 'COST', 'ORCL', 'NFLX',
 ];
 
-const TICKER_RE = /^[A-Z0-9.\-]+$/;
+const TICKER_RE = /^[A-Z0-9.-]+$/;
 
 // ── GET /api/watchlist ────────────────────────────────────────────────────────
 router.get('/', authenticate, asyncHandler(async (req, res) => {

@@ -77,6 +77,31 @@ describe('WatchlistPage', () => {
     expect(api.put).toHaveBeenCalledWith('/watchlist', { symbols: ['AAPL', 'NVDA'] })
   })
 
+  test('re-adding a seed symbol PUTs it back in its curated slot, not the tail', async () => {
+    ;(api.get as Mock).mockImplementation((url: string) => {
+      if (url === '/watchlist') return Promise.resolve({ data: { symbols: ['MSFT', 'NVDA'] } })
+      if (url === '/market/prices') return Promise.resolve({ data: { prices: [] } })
+      if (url === '/market/search') return Promise.resolve({ data: { results: [{ symbol: 'AAPL', name: 'Apple', type: 'stock' }] } })
+      return Promise.resolve({ data: {} })
+    })
+    ;(api.put as Mock).mockResolvedValue({ data: { symbols: ['AAPL', 'MSFT', 'NVDA'] } })
+    renderPage()
+    const user = userEvent.setup()
+    await screen.findByText('MSFT')
+    await user.type(screen.getByPlaceholderText('Search symbol or company…'), 'app')
+    await user.click(await screen.findByText('Apple'))
+    // AAPL (seed rank 0) slots to the front rather than appending after NVDA.
+    expect(api.put).toHaveBeenCalledWith('/watchlist', { symbols: ['AAPL', 'MSFT', 'NVDA'] })
+  })
+
+  test('renders rows in canonical seed order even when stored out of order', async () => {
+    mockGet(['MSFT', 'AAPL'])
+    renderPage()
+    await screen.findByText('AAPL')
+    const order = screen.getAllByLabelText(/^Remove /).map((el) => el.getAttribute('aria-label'))
+    expect(order).toEqual(['Remove AAPL', 'Remove MSFT'])
+  })
+
   test('shows the empty state when the list is empty', async () => {
     mockGet([])
     renderPage()

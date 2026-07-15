@@ -9,7 +9,7 @@ import { api, getApiErrorMessage } from '@/lib/api'
 import { useLivePrices } from '@/hooks/useWebSocket'
 import { useToast } from '@/hooks/useToast'
 import { formatCurrency } from '@/lib/format'
-import { SYMBOL_NAMES } from '@/lib/watchlist'
+import { SYMBOL_NAMES, orderBySeedRank } from '@/lib/watchlist'
 import { useWatchlist, useWatchlistMutation } from '@/hooks/useWatchlist'
 import type { MarketPricesResponse, SearchResult } from '@/types/api'
 
@@ -18,7 +18,10 @@ import type { MarketPricesResponse, SearchResult } from '@/types/api'
 const changePct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 
 export function WatchlistPage() {
-  const { data: symbols = [] } = useWatchlist()
+  const { data: storedSymbols = [] } = useWatchlist()
+  // Render (and persist) in canonical seed order so a re-added symbol returns to
+  // its curated slot instead of the tail. Also heals any already-out-of-order list.
+  const symbols = useMemo(() => orderBySeedRank(storedSymbols), [storedSymbols])
   const mutation = useWatchlistMutation()
   const { toast } = useToast()
   const [query, setQuery] = useState('')
@@ -45,8 +48,8 @@ export function WatchlistPage() {
   const live = useLivePrices(symbols)
 
   const toggle = (sym: string) => {
-    const next = symbols.includes(sym) ? symbols.filter((s) => s !== sym) : [...symbols, sym]
-    mutation.mutate(next, { onError: (err) => toast(getApiErrorMessage(err), 'error') })
+    const base = symbols.includes(sym) ? symbols.filter((s) => s !== sym) : [...symbols, sym]
+    mutation.mutate(orderBySeedRank(base), { onError: (err) => toast(getApiErrorMessage(err), 'error') })
   }
 
   return (

@@ -19,6 +19,28 @@ router.get('/search', optionalAuth, [
   res.json({ results, count: results.length });
 }));
 
+// GET /api/market/prices?symbols=AAPL,MSFT — batch price + day-change for a watchlist
+router.get('/prices', optionalAuth, [
+  query('symbols').trim().notEmpty().isLength({ max: 2000 }),
+], asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const symbols = [...new Set(
+    req.query.symbols.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+  )].slice(0, 100);
+
+  const settled = await Promise.allSettled(symbols.map((s) => getCurrentPrice(s)));
+  const prices = [];
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) {
+      prices.push({ symbol: symbols[i], price: r.value.price, change_percent: Number(r.value.change_percent) });
+    }
+  });
+
+  res.json({ prices });
+}));
+
 // GET /api/market/price/:symbol
 router.get('/price/:symbol', optionalAuth, [
   param('symbol').trim().notEmpty().isLength({ max: 20 }).toUpperCase(),

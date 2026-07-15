@@ -1,24 +1,65 @@
 @import "tailwindcss";
 
 @theme {
+  /* Surfaces — a small elevation scale keeps depth consistent app-wide */
   --color-background: #0b0d12;
   --color-foreground: #e5e7eb;
   --color-card: #14161d;
+  --color-elevated: #1b1e27; /* raised: popovers, hover, sticky headers */
   --color-border: #262932;
   --color-muted: #9ca3af;
+  --color-muted-strong: #cbd5e1; /* secondary text on darker chips (AA on border) */
   --color-primary: #7c3aed;
   --color-primary-foreground: #ffffff;
+  --color-ring: #8b5cf6; /* brighter violet, reads clearly against dark surfaces */
   --color-success: #22c55e;
   --color-danger: #ef4444;
+
+  /* Type — Space Grotesk carries display personality; Inter does the reading.
+     Financial figures are set tabular so columns never jitter. */
+  --font-sans: 'Inter Variable', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Display face for page/section titles (h1/h2) — cascades to every page
+   without touching page markup. Card titles (h3, small labels) stay in the
+   body face on purpose. */
+h1, h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Financial data reads as an instrument: fixed-width figures in every table
+   and anywhere .tnum is applied, so prices and P&L align down the column. */
+table {
+  font-variant-numeric: tabular-nums;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Accessibility quality floor: honor reduced-motion everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

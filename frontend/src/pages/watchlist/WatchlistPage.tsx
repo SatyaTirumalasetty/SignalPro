@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Search, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -92,10 +91,13 @@ export function WatchlistPage() {
                 <button onClick={() => toggle(sym)} aria-label={`Remove ${sym}`} className="shrink-0">
                   <Heart size={18} className="fill-danger text-danger" />
                 </button>
-                <Link to={`/analyze/${sym}`} className="min-w-0 flex-1">
+                {/* Row is non-interactive here: the /analyze symbol page ships in a
+                    separate change, so we render the label statically rather than
+                    linking to a route that doesn't exist yet. */}
+                <div className="min-w-0 flex-1">
                   <div className="font-medium text-foreground">{sym}</div>
                   <div className="truncate text-xs text-muted">{SYMBOL_NAMES[sym] ?? ''}</div>
-                </Link>
+                </div>
                 <div className="text-right text-sm font-medium text-foreground">{price != null ? formatCurrency(price) : '—'}</div>
                 {change != null && (
                   <Badge variant={change >= 0 ? 'success' : 'danger'} className="w-20 justify-center">{changePct(change)}</Badge>

@@ -19,4 +19,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // UI primitives intentionally re-export library roots (e.g. `export const Tabs = RadixTabs.Root`)
+    // alongside wrapper components. That trips react-refresh's only-export-components heuristic even
+    // though these are components. The rule only affects dev Fast Refresh, so scope it off here.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

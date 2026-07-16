@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -42,23 +42,26 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
     enabled: open,
   })
   const connections = (connectionsQuery.data ?? []).filter((c) => c.status === 'connected')
+  // Default to the first connected broker by deriving it during render, rather than syncing into state.
+  const selectedConnectionId = brokerConnectionId || connections[0]?.id || ''
 
-  useEffect(() => {
-    if (!brokerConnectionId && connections.length > 0) setBrokerConnectionId(connections[0].id)
-  }, [connections, brokerConnectionId])
-
-  // Pre-fill from a signal (or other source) whenever the dialog is opened
-  useEffect(() => {
-    if (!open) return
-    setSymbol(initialValues?.symbol ?? '')
-    setSide(initialValues?.side ?? 'buy')
-    setStopLoss(initialValues?.stopLoss ? String(initialValues.stopLoss) : '')
-    setTakeProfit(initialValues?.takeProfit ? String(initialValues.takeProfit) : '')
-    setOrderType('market')
-    setQuantity('')
-    setPrice('')
-    setError(null)
-  }, [open, initialValues])
+  // Pre-fill the form when the dialog opens (or reopens for a different signal). Keyed on a stable
+  // signature rather than an effect, so incidental parent re-renders don't clobber in-progress edits.
+  const prefillSignature = open ? `open:${initialValues?.signalId ?? ''}` : 'closed'
+  const [appliedSignature, setAppliedSignature] = useState('closed')
+  if (prefillSignature !== appliedSignature) {
+    setAppliedSignature(prefillSignature)
+    if (open) {
+      setSymbol(initialValues?.symbol ?? '')
+      setSide(initialValues?.side ?? 'buy')
+      setStopLoss(initialValues?.stopLoss ? String(initialValues.stopLoss) : '')
+      setTakeProfit(initialValues?.takeProfit ? String(initialValues.takeProfit) : '')
+      setOrderType('market')
+      setQuantity('')
+      setPrice('')
+      setError(null)
+    }
+  }
 
   const placeMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/trading/orders', payload),
@@ -80,7 +83,7 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
     e.preventDefault()
     setError(null)
     placeMutation.mutate({
-      broker_connection_id: brokerConnectionId,
+      broker_connection_id: selectedConnectionId,
       symbol: symbol.toUpperCase(),
       side,
       order_type: orderType,
@@ -120,7 +123,7 @@ export function PlaceOrderDialog({ open, onClose, initialValues }: PlaceOrderDia
           </p>
         )}
         <Select
-          value={brokerConnectionId}
+          value={selectedConnectionId}
           onValueChange={setBrokerConnectionId}
           placeholder="Select broker connection"
           options={connections.map((conn) => ({ value: conn.id, label: `${conn.name} (${conn.broker_id})` }))}

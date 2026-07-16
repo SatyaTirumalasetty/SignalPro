@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +28,7 @@ export function AutoTradingPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [symbolInput, setSymbolInput] = useState('')
-  const [form, setForm] = useState<AutoTradingSettings | null>(null)
+  const [formEdits, setFormEdits] = useState<AutoTradingSettings | null>(null)
 
   const settingsQuery = useQuery({
     queryKey: ['auto-trading-settings'],
@@ -52,14 +52,13 @@ export function AutoTradingPage() {
     refetchInterval: 60_000,
   })
 
-  useEffect(() => {
-    if (settingsQuery.data && !form) setForm(settingsQuery.data)
-  }, [settingsQuery.data, form])
+  // Local edits take precedence; before the user touches anything, mirror the server settings.
+  const form = formEdits ?? settingsQuery.data ?? null
 
   const saveMutation = useMutation({
     mutationFn: (payload: AutoTradingSettings) => api.put<{ settings: AutoTradingSettings }>('/auto-trading/settings', payload),
     onSuccess: (res) => {
-      setForm(res.data.settings)
+      setFormEdits(res.data.settings)
       queryClient.invalidateQueries({ queryKey: ['auto-trading-settings'] })
       queryClient.invalidateQueries({ queryKey: ['auto-trading-status'] })
       toast('Auto-trading settings saved', 'success')
@@ -84,19 +83,19 @@ export function AutoTradingPage() {
       setSymbolInput('')
       return
     }
-    setForm({ ...form, symbols: [...form.symbols, symbol] })
+    setFormEdits({ ...form, symbols: [...form.symbols, symbol] })
     setSymbolInput('')
   }
 
   const removeSymbol = (symbol: string) => {
-    setForm({ ...form, symbols: form.symbols.filter((s) => s !== symbol) })
+    setFormEdits({ ...form, symbols: form.symbols.filter((s) => s !== symbol) })
   }
 
   const toggleTimeframe = (tf: string) => {
     const timeframes = form.timeframes.includes(tf)
       ? form.timeframes.filter((t) => t !== tf)
       : [...form.timeframes, tf]
-    setForm({ ...form, timeframes })
+    setFormEdits({ ...form, timeframes })
   }
 
   const handleSave = () => {
@@ -140,7 +139,7 @@ export function AutoTradingPage() {
               <p className="text-sm font-medium text-foreground">Enable auto-trading</p>
               <p className="text-sm text-muted">Runs every ~15 minutes against your configured watchlist.</p>
             </div>
-            <Switch checked={form.enabled} onCheckedChange={(enabled) => setForm({ ...form, enabled })} />
+            <Switch checked={form.enabled} onCheckedChange={(enabled) => setFormEdits({ ...form, enabled })} />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -148,7 +147,7 @@ export function AutoTradingPage() {
               <label className="text-sm font-medium text-foreground">Broker connection</label>
               <Select
                 value={form.broker_connection_id ?? ''}
-                onValueChange={(value) => setForm({ ...form, broker_connection_id: value || null })}
+                onValueChange={(value) => setFormEdits({ ...form, broker_connection_id: value || null })}
                 placeholder="Select a broker connection"
                 options={connectedConnections.map((c) => ({ value: c.id, label: `${c.name} (${c.broker_id})` }))}
               />
@@ -161,7 +160,7 @@ export function AutoTradingPage() {
                 min="0"
                 max="100"
                 value={form.min_confidence}
-                onChange={(e) => setForm({ ...form, min_confidence: Number(e.target.value) })}
+                onChange={(e) => setFormEdits({ ...form, min_confidence: Number(e.target.value) })}
               />
             </div>
 
@@ -173,7 +172,7 @@ export function AutoTradingPage() {
                 max="100"
                 step="0.1"
                 value={form.risk_per_trade_pct * 100}
-                onChange={(e) => setForm({ ...form, risk_per_trade_pct: Number(e.target.value) / 100 })}
+                onChange={(e) => setFormEdits({ ...form, risk_per_trade_pct: Number(e.target.value) / 100 })}
               />
             </div>
 
@@ -185,7 +184,7 @@ export function AutoTradingPage() {
                 max="100"
                 step="0.1"
                 value={form.max_daily_loss_pct * 100}
-                onChange={(e) => setForm({ ...form, max_daily_loss_pct: Number(e.target.value) / 100 })}
+                onChange={(e) => setFormEdits({ ...form, max_daily_loss_pct: Number(e.target.value) / 100 })}
               />
             </div>
 
@@ -196,7 +195,7 @@ export function AutoTradingPage() {
                 min="1"
                 max="1440"
                 value={form.cooldown_minutes}
-                onChange={(e) => setForm({ ...form, cooldown_minutes: Number(e.target.value) })}
+                onChange={(e) => setFormEdits({ ...form, cooldown_minutes: Number(e.target.value) })}
               />
             </div>
 
@@ -207,7 +206,7 @@ export function AutoTradingPage() {
                 min="1"
                 max="100"
                 value={form.max_trades_per_day}
-                onChange={(e) => setForm({ ...form, max_trades_per_day: Number(e.target.value) })}
+                onChange={(e) => setFormEdits({ ...form, max_trades_per_day: Number(e.target.value) })}
               />
             </div>
           </div>

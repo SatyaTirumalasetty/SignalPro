@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, test, expect, vi, beforeEach, type Mock } from 'vitest'
 import { AutoTradingPage } from './AutoTradingPage'
@@ -74,7 +75,9 @@ function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <AutoTradingPage />
+      <MemoryRouter>
+        <AutoTradingPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }

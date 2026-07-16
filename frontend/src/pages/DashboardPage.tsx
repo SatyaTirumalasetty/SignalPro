@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useLivePrices } from '@/hooks/useWebSocket'
+import { SignalTradeButtons } from '@/components/analysis/SignalTradeButtons'
 import type { Order, PortfolioSummary, Signal } from '@/types/api'
 import { signalBadgeVariant, formatCurrency, formatPercent } from '@/lib/format'
 
@@ -140,10 +141,13 @@ export function DashboardPage() {
             {signals.isLoading && <p className="text-sm text-muted">Loading…</p>}
             {signals.data?.length === 0 && <p className="text-sm text-muted">No signals yet</p>}
             {signals.data?.map((signal) => (
-              <div key={signal.id} className="flex items-center justify-between text-sm">
-                <span className="font-medium text-foreground">{signal.symbol}</span>
+              <div key={signal.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <Link to={`/analyze/${signal.symbol}?signal=${signal.id}`} className="font-medium text-foreground hover:underline">
+                  {signal.symbol}
+                </Link>
                 <Badge variant={signalBadgeVariant(signal.signal_type)}>{signal.signal_type}</Badge>
                 <span className="text-muted">{formatPercent(signal.confidence)} confidence</span>
+                <SignalTradeButtons signal={signal} />
               </div>
             ))}
           </CardContent>

@@ -36,7 +36,7 @@ describe('AppLayout', () => {
     renderLayout()
 
     expect(screen.getByText('Home content')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Admin/ })).toBeInTheDocument()
   })
 

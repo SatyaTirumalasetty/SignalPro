@@ -1,6 +1,6 @@
 const express = require('express');
 const { query, param, validationResult } = require('express-validator');
-const { getCurrentPrice, getLiveQuote, getHistoricalData, searchSymbols } = require('../services/marketData');
+const { getCurrentPrice, getLiveQuote, getHistoricalData, getHistoricalPage, searchSymbols } = require('../services/marketData');
 const { calculateAll } = require('../services/indicators');
 const { optionalAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -39,21 +39,23 @@ router.get('/quote/:symbol', optionalAuth, [
   res.json({ quote });
 }));
 
-// GET /api/market/history/:symbol?interval=1h&bars=200
+// GET /api/market/history/:symbol?interval=1h&bars=300&before=<epoch_ms>
 router.get('/history/:symbol', optionalAuth, [
   param('symbol').trim().notEmpty().isLength({ max: 20 }),
   query('interval').optional().isIn(VALID_INTERVALS),
-  query('bars').optional().isInt({ min: 10, max: 500 }),
+  query('bars').optional().isInt({ min: 10, max: 1000 }),
+  query('before').optional().isInt({ min: 0 }),
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   const symbol = req.params.symbol.toUpperCase();
   const interval = req.query.interval || '1h';
-  const bars = Math.min(500, parseInt(req.query.bars) || 200);
+  const bars = Math.min(1000, parseInt(req.query.bars) || 200);
+  const before = req.query.before ? parseInt(req.query.before) : null;
 
-  const data = await getHistoricalData(symbol, interval, bars);
-  res.json({ symbol, interval, bars: data.candles.length, data });
+  const data = await getHistoricalPage(symbol, interval, bars, before);
+  res.json({ symbol, interval, bars: data.candles.length, has_more: data.has_more, data });
 }));
 
 // GET /api/market/indicators/:symbol?interval=1h

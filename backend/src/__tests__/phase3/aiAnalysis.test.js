@@ -112,14 +112,49 @@ describe('generateSignal()', () => {
       .rejects.toMatchObject({ status: 503 });
   });
 
-  test('throws 502 for malformed JSON response', async () => {
-    mockMessageCreate.mockResolvedValueOnce({
+  test('throws 502 when every attempt returns malformed JSON', async () => {
+    mockMessageCreate.mockResolvedValue({
       content: [{ text: 'This is not JSON' }],
       usage: { input_tokens: 100, output_tokens: 50 },
     });
 
     await expect(generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS))
       .rejects.toMatchObject({ status: 502 });
+    expect(mockMessageCreate).toHaveBeenCalledTimes(2);
+  });
+
+  test('retries once on malformed JSON, then succeeds', async () => {
+    mockMessageCreate
+      .mockResolvedValueOnce({ content: [{ text: 'oops' }], usage: { input_tokens: 10, output_tokens: 5 } })
+      .mockResolvedValueOnce({
+        content: [{ text: JSON.stringify(VALID_AI_RESPONSE) }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+    const result = await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
+    expect(result.signal).toBe('buy');
+    expect(mockMessageCreate).toHaveBeenCalledTimes(2);
+  });
+
+  test('parses JSON wrapped in markdown fences', async () => {
+    mockMessageCreate.mockResolvedValueOnce({
+      content: [{ text: '```json\n' + JSON.stringify(VALID_AI_RESPONSE) + '\n```' }],
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+
+    const result = await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
+    expect(result.signal).toBe('buy');
+    expect(mockMessageCreate).toHaveBeenCalledTimes(1);
+  });
+
+  test('parses JSON preceded by preamble text', async () => {
+    mockMessageCreate.mockResolvedValueOnce({
+      content: [{ text: 'Here is the analysis:\n' + JSON.stringify(VALID_AI_RESPONSE) }],
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+
+    const result = await generateSignal(USER_ID, 'AAPL', '1h', MOCK_PRICE_DATA, MOCK_INDICATORS);
+    expect(result.signal).toBe('buy');
   });
 
   test('throws 502 for invalid signal type', async () => {

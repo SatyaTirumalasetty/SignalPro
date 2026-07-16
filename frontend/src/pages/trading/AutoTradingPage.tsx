@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -175,11 +176,16 @@ export function AutoTradingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Auto Trading</h1>
-        <p className="text-sm text-muted">
-          Let SignalPro continuously analyze your watchlist and place trades automatically through your connected broker.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Auto Trading</h1>
+          <p className="text-sm text-muted">
+            Let SignalPro continuously analyze your watchlist and place trades automatically through your connected broker.
+          </p>
+        </div>
+        <Link to="/auto-trading/dashboard" className="shrink-0 rounded-md border border-border px-3 py-2 text-sm text-muted hover:text-foreground">
+          View dashboard
+        </Link>
       </div>
 
       {wasAutoDisabled && (

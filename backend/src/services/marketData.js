@@ -139,6 +139,34 @@ async function getHistoricalData(symbol, interval = '1h', bars = 200) {
   return result;
 }
 
+// Cursor-paged history for the analysis chart. Fetches the interval's FULL
+// Yahoo range once, caches it whole, and slices pages out of the cache so
+// panning back never re-hits the upstream API.
+const FULL_RANGE_BARS = 5000;
+
+async function getHistoricalPage(symbol, interval = '1h', bars = 300, before = null) {
+  const cacheKey = `histfull:${symbol}:${interval}`;
+  let full = await cacheGet(cacheKey);
+  if (!full) {
+    full = await fetchYahoo(symbol, interval, FULL_RANGE_BARS);
+    const ttl = interval === '1m' ? 60 : interval === '5m' ? 300 : interval === '15m' ? 600 : interval === '1h' ? 900 : 3600;
+    await cacheSet(cacheKey, full, ttl);
+  }
+
+  const all = full.candles;
+  const upper = before ? all.filter((c) => c.timestamp < before) : all;
+  const page = upper.slice(-bars);
+
+  return {
+    symbol: full.symbol,
+    interval,
+    current_price: full.current_price,
+    previous_close: full.previous_close,
+    candles: page,
+    has_more: upper.length > page.length,
+  };
+}
+
 async function searchSymbols(query) {
   const cacheKey = `search:${query.toLowerCase()}`;
   const cached = await cacheGet(cacheKey);
@@ -163,4 +191,4 @@ async function searchSymbols(query) {
   return results;
 }
 
-module.exports = { getCurrentPrice, getLiveQuote, getHistoricalData, searchSymbols };
+module.exports = { getCurrentPrice, getLiveQuote, getHistoricalData, getHistoricalPage, searchSymbols };

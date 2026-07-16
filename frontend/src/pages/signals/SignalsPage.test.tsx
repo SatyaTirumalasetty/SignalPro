@@ -17,6 +17,12 @@ vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({ toast: toastFn }),
 }))
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  useNavigate: () => mockNavigate,
+}))
+
 const signals: Signal[] = [
   {
     id: 'sig-1',
@@ -47,6 +53,15 @@ function mockApiGet(overrides: Record<string, unknown> = {}) {
     if (url === '/analysis/signals') return Promise.resolve({ data: { signals: overrides.signals ?? signals } })
     if (url === '/brokers/connections') {
       return Promise.resolve({ data: { connections: overrides.connections ?? [{ id: 'conn-1', broker_id: 'alpaca', name: 'My Alpaca', status: 'connected' }] } })
+    }
+    if (url === '/users/me') {
+      return Promise.resolve({ data: overrides.me ?? { user: { preferences: {} } } })
+    }
+    if (/^\/brokers\/connections\/.+\/accounts$/.test(url)) {
+      return Promise.resolve({ data: { account: overrides.account ?? { funds: { equity: 0 } } } })
+    }
+    if (url === '/auto-trading/settings') {
+      return Promise.resolve({ data: { settings: overrides.settings ?? { risk_per_trade_pct: 0.01 } } })
     }
     return Promise.resolve({ data: {} })
   })
@@ -132,5 +147,57 @@ describe('SignalsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Generate signal' }))
 
     expect(await screen.findByText('Rate limited')).toBeInTheDocument()
+  })
+
+  test('Buy navigates to the armed analysis page when instant mode is off', async () => {
+    mockApiGet() // instant off by default
+    renderPage()
+
+    const buy = (await screen.findAllByRole('button', { name: /^buy$/i }))[0]
+    fireEvent.click(buy)
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(/^\/analyze\/[A-Z.]+\?signal=.+&arm=1$/)),
+    )
+  })
+
+  test('Buy places the order immediately when instant mode is on', async () => {
+    mockApiGet({
+      me: { user: { preferences: { trading: { instant_orders: true } } } },
+      connections: [{ id: 'conn-1', name: 'Alpaca', broker_id: 'alpaca', status: 'connected' }],
+      account: { funds: { equity: 100000 } },
+      settings: { risk_per_trade_pct: 0.01 },
+    })
+    ;(api.post as Mock).mockResolvedValue({ data: { order: { id: 'order-9' } } })
+    renderPage()
+
+    const buy = (await screen.findAllByRole('button', { name: /^buy$/i }))[0]
+    fireEvent.click(buy)
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/trading/orders', expect.objectContaining({ side: 'buy', signal_id: expect.any(String) })),
+    )
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  test('instant-flag fetch failure surfaces a toast and places no order', async () => {
+    ;(api.get as Mock).mockImplementation((url: string) => {
+      if (url === '/users/me') {
+        return Promise.reject(new Error('Network error'))
+      }
+      if (url === '/analysis/signals') return Promise.resolve({ data: { signals } })
+      return Promise.resolve({ data: {} })
+    })
+    ;(api.post as Mock).mockResolvedValue({ data: { order: { id: 'order-9' } } })
+    renderPage()
+
+    const buy = (await screen.findAllByRole('button', { name: /^buy$/i }))[0]
+    fireEvent.click(buy)
+
+    await waitFor(() =>
+      expect(toastFn).toHaveBeenCalledWith('Network error', 'error'),
+    )
+    expect(api.post).not.toHaveBeenCalled()
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 })

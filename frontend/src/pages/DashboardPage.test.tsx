@@ -7,11 +7,16 @@ import { api } from '@/lib/api'
 import type { PortfolioSummary, Order, Signal } from '@/types/api'
 
 vi.mock('@/lib/api', () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn() },
+  getApiErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'Unexpected error'),
 }))
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { email: 'trader@example.com', full_name: 'Trader Joe' } }),
+}))
+
+vi.mock('@/hooks/useToast', () => ({
+  useToast: () => ({ toast: vi.fn() }),
 }))
 
 vi.mock('@/hooks/useWebSocket', () => ({

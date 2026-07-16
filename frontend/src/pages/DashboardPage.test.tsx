@@ -37,6 +37,8 @@ function mockApiGet(overrides: Record<string, unknown> = {}) {
     if (url === '/trading/portfolio') return Promise.resolve({ data: overrides.portfolio ?? portfolio })
     if (url === '/trading/orders') return Promise.resolve({ data: { orders: overrides.orders ?? orders } })
     if (url === '/analysis/signals') return Promise.resolve({ data: { signals: overrides.signals ?? signals } })
+    if (url === '/brokers/connections') return Promise.resolve({ data: { connections: [] } })
+    if (url === '/auto-trading/settings') return Promise.resolve({ data: { settings: null } })
     return Promise.resolve({ data: {} })
   })
 }

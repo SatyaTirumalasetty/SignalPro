@@ -85,6 +85,12 @@ describe('GetStartedCard', () => {
     expect(screen.queryByText('Get started')).not.toBeInTheDocument()
   })
 
+  test('renders nothing while queries are loading', () => {
+    ;(api.get as Mock).mockImplementation(() => new Promise(() => {}))
+    renderCard()
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument()
+  })
+
   test('dismissed on this device: renders nothing even when incomplete', async () => {
     localStorage.setItem('getStarted.dismissed', '1')
     mockState([], makeSettings())

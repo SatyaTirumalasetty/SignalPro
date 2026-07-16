@@ -51,7 +51,7 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Lint
+      - name: Lint backend
         working-directory: backend
         run: npx eslint src/ --max-warnings 0
 
@@ -85,6 +85,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
 
       - name: Run frontend tests
         working-directory: frontend

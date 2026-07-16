@@ -38,13 +38,14 @@ function mockState(connections: BrokerConnection[], settings: AutoTradingSetting
 
 function renderCard() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <GetStartedCard />
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { queryClient, ...utils }
 }
 
 beforeEach(() => {
@@ -79,17 +80,17 @@ describe('GetStartedCard', () => {
 
   test('all steps done: renders nothing', async () => {
     mockState(connected, makeSettings({ broker_connection_id: 'conn-1', symbols: ['AAPL'], enabled: true }))
-    renderCard()
-    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.queryByText('Get started')).not.toBeInTheDocument())
+    const { queryClient } = renderCard()
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument()
   })
 
   test('dismissed on this device: renders nothing even when incomplete', async () => {
     localStorage.setItem('getStarted.dismissed', '1')
     mockState([], makeSettings())
-    renderCard()
-    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.queryByText('Get started')).not.toBeInTheDocument())
+    const { queryClient } = renderCard()
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument()
   })
 
   test('clicking Dismiss hides the card and persists the flag', async () => {

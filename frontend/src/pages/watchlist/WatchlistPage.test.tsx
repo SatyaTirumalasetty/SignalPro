@@ -51,6 +51,13 @@ describe('WatchlistPage', () => {
     expect(screen.getByText('-0.30%')).toBeInTheDocument()
   })
 
+  test('each row links to the symbol analysis page', async () => {
+    mockGet(['AAPL', 'MSFT'])
+    renderPage()
+    const link = await screen.findByRole('link', { name: /AAPL/ })
+    expect(link).toHaveAttribute('href', '/analyze/AAPL')
+  })
+
   test('un-hearting a row PUTs the reduced list', async () => {
     mockGet(['AAPL', 'MSFT'])
     ;(api.put as Mock).mockResolvedValue({ data: { symbols: ['MSFT'] } })

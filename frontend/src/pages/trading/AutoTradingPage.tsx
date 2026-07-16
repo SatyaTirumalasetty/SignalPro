@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +28,7 @@ export function AutoTradingPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [symbolInput, setSymbolInput] = useState('')
-  const [form, setForm] = useState<AutoTradingSettings | null>(null)
+  const [formEdits, setForm] = useState<AutoTradingSettings | null>(null)
 
   const settingsQuery = useQuery({
     queryKey: ['auto-trading-settings'],
@@ -52,9 +52,8 @@ export function AutoTradingPage() {
     refetchInterval: 60_000,
   })
 
-  useEffect(() => {
-    if (settingsQuery.data && !form) setForm(settingsQuery.data)
-  }, [settingsQuery.data, form])
+  // Local edits take precedence; before the user touches anything, mirror the server settings.
+  const form = formEdits ?? settingsQuery.data ?? null
 
   const saveMutation = useMutation({
     mutationFn: (payload: AutoTradingSettings) => api.put<{ settings: AutoTradingSettings }>('/auto-trading/settings', payload),

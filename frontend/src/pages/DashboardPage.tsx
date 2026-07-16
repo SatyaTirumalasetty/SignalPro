@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { GetStartedCard } from '@/components/onboarding/GetStartedCard'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useLivePrices } from '@/hooks/useWebSocket'
@@ -37,6 +38,8 @@ export function DashboardPage() {
         <h1 className="text-xl font-semibold text-foreground">Welcome back{user?.full_name ? `, ${user.full_name}` : ''}</h1>
         <p className="text-sm text-muted">Here's what's happening with your portfolio</p>
       </div>
+
+      <GetStartedCard />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

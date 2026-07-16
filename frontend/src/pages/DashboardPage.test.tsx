@@ -72,6 +72,7 @@ describe('DashboardPage', () => {
     mockApiGet({ orders: [], signals: [], portfolio: { positions: [], summary: { open_positions: 0, closed_positions: 0, realized_pnl: 0, unrealized_pnl: 0 } } })
     renderPage()
 
+    expect(await screen.findByText('Get started')).toBeInTheDocument()
     expect(await screen.findByText('No orders yet')).toBeInTheDocument()
     expect(screen.getByText('No signals yet')).toBeInTheDocument()
   })

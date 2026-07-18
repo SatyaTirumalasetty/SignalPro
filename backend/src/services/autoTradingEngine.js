@@ -311,10 +311,25 @@ async function logRun({ userId, symbol, timeframe, decision, confidence, action,
 // ── Cron job ─────────────────────────────────────────────────────────────────
 
 function startAutoTradingCron() {
+  // A cycle is one Claude call per symbol and can outlast its own interval, so
+  // a slow one would otherwise overlap the next fire and double-execute.
+  let cycleInFlight = false;
+
   // Staggered off the broker-sync `*/15 * * * *` schedule
   cron.schedule('7,22,37,52 * * * *', async () => {
+    if (cycleInFlight) {
+      logger.warn('Cron: previous auto-trading cycle still running — skipping this fire');
+      return;
+    }
+    cycleInFlight = true;
     logger.info('Cron: starting auto-trading cycle');
-    await runAutoTradingCycle().catch((err) => logger.error({ err }, 'Auto-trading cycle failed'));
+    try {
+      await runAutoTradingCycle();
+    } catch (err) {
+      logger.error({ err }, 'Auto-trading cycle failed');
+    } finally {
+      cycleInFlight = false;
+    }
   });
 
   logger.info('Auto-trading cron job started');

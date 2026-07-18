@@ -9,6 +9,9 @@ const mockExecuteDecision = jest.fn();
 const mockDailyLossEmail = jest.fn();
 const mockDisabledEmail = jest.fn();
 
+jest.mock('node-cron', () => ({
+  schedule: jest.fn((_expr, _fn) => ({ start: jest.fn(), stop: jest.fn() })),
+}));
 jest.mock('../../config/database', () => ({ db: mockDb }));
 jest.mock('../../config/brokerEncryption', () => ({ decryptCredentials: mockDecryptCredentials }));
 jest.mock('../../services/brokers/index', () => ({ getAdapter: mockGetAdapter }));
@@ -27,7 +30,7 @@ jest.mock('../../services/emailService', () => ({
 }));
 
 const {
-  runForUser, processSymbol, getAutoTradingSettings, DEFAULT_SETTINGS,
+  runForUser, processSymbol, getAutoTradingSettings, DEFAULT_SETTINGS, startAutoTradingCron,
 } = require('../../services/autoTradingEngine');
 
 const USER_ID = 'user-1';
@@ -240,5 +243,56 @@ describe('processSymbol gating', () => {
     const params = insert[1];
     const detail = JSON.parse(params[params.length - 1]);
     expect(detail.decision.action).toBe('open_long');
+  });
+});
+
+// A cycle is one Claude call per symbol and can outlast its own cron interval.
+// Overlapping fires would double-analyze and double-execute the same symbols.
+describe('startAutoTradingCron', () => {
+  const cron = require('node-cron');
+
+  // Holds a cycle open at its first query so the next fire overlaps it.
+  function stallCycle() {
+    let release;
+    mockDb.manyOrNone.mockImplementationOnce(() => new Promise((res) => { release = () => res([]); }));
+    return () => release();
+  }
+
+  function scheduledTick() {
+    cron.schedule.mockClear();
+    startAutoTradingCron();
+    return cron.schedule.mock.calls[0][1];
+  }
+
+  test('skips a fire while the previous cycle is still running', async () => {
+    const release = stallCycle();
+    const tick = scheduledTick();
+
+    const inFlight = tick();
+    await tick(); // overlapping fire
+
+    expect(mockDb.manyOrNone).toHaveBeenCalledTimes(1);
+
+    release();
+    await inFlight;
+  });
+
+  test('runs again once the previous cycle has finished', async () => {
+    const tick = scheduledTick();
+
+    await tick();
+    await tick();
+
+    expect(mockDb.manyOrNone).toHaveBeenCalledTimes(2);
+  });
+
+  test('a failed cycle still releases the guard', async () => {
+    mockDb.manyOrNone.mockRejectedValueOnce(new Error('db down'));
+    const tick = scheduledTick();
+
+    await tick(); // throws internally, must not leave the guard stuck
+    await tick();
+
+    expect(mockDb.manyOrNone).toHaveBeenCalledTimes(2);
   });
 });

@@ -315,8 +315,8 @@ function startAutoTradingCron() {
   // a slow one would otherwise overlap the next fire and double-execute.
   let cycleInFlight = false;
 
-  // Staggered off the broker-sync `*/15 * * * *` schedule
-  cron.schedule('7,22,37,52 * * * *', async () => {
+  // TEMPORARY local trial override: every 2 min (was `7,22,37,52 * * * *`).
+  cron.schedule('*/2 * * * *', async () => {
     if (cycleInFlight) {
       logger.warn('Cron: previous auto-trading cycle still running — skipping this fire');
       return;

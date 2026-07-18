@@ -13,6 +13,21 @@ function getClient() {
   return anthropic;
 }
 
+// Models occasionally wrap the JSON in markdown fences or a line of preamble
+// despite instructions. Strip fences, then fall back to the outermost {...}.
+function extractJson(text) {
+  const trimmed = (text || '').trim();
+  const unfenced = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  try {
+    return JSON.parse(unfenced);
+  } catch {
+    const start = unfenced.indexOf('{');
+    const end = unfenced.lastIndexOf('}');
+    if (start === -1 || end <= start) throw new Error('no JSON object found');
+    return JSON.parse(unfenced.slice(start, end + 1));
+  }
+}
+
 const SYSTEM_PROMPT = `You are an expert financial analyst and algorithmic trader with deep knowledge of technical analysis, market microstructure, and risk management.
 
 Analyze the provided market data, technical indicators, and recent news headlines to generate a precise trading signal.
@@ -86,26 +101,35 @@ async function generateSignal(userId, symbol, timeframe, priceData, indicators, 
 
   const prompt = buildPrompt(symbol, timeframe, priceData, indicators, news);
 
-  let message;
-  try {
-    message = await getClient().messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-    });
-  } catch (err) {
-    logger.error({ err: err.message, symbol }, 'Anthropic API error');
-    throw Object.assign(new Error(`AI service error: ${err.message}`), { status: 502 });
+  // One retry on malformed output: a fresh sample usually comes back clean.
+  let parsed = null;
+  let tokensUsed = 0;
+  for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+    let message;
+    try {
+      message = await getClient().messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+      });
+    } catch (err) {
+      logger.error({ err: err.message, symbol }, 'Anthropic API error');
+      throw Object.assign(new Error(`AI service error: ${err.message}`), { status: 502 });
+    }
+
+    tokensUsed += (message.usage?.input_tokens || 0) + (message.usage?.output_tokens || 0);
+    const rawText = extractText(message);
+    try {
+      parsed = extractJson(rawText);
+    } catch {
+      logger.warn(
+        { symbol, attempt, stop_reason: message.stop_reason, snippet: rawText.slice(0, 200) },
+        'AI signal response was not parseable JSON'
+      );
+    }
   }
-
-  const tokensUsed = message.usage?.input_tokens + message.usage?.output_tokens || 0;
-  const rawText = message.content?.[0]?.text || '';
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawText.trim());
-  } catch {
+  if (!parsed) {
     throw Object.assign(new Error('AI returned malformed JSON — please retry'), { status: 502 });
   }
 
@@ -288,7 +312,14 @@ ${newsSection}`;
 }
 
 function extractText(message) {
-  return (message.content || []).find((b) => b.type === 'text')?.text || '';
+  const blocks = message.content || [];
+  // Prefer a typed text block (thinking-enabled responses put it after the
+  // thinking block); fall back to any block carrying text.
+  return (
+    blocks.find((b) => b.type === 'text')?.text ??
+    blocks.find((b) => typeof b.text === 'string')?.text ??
+    ''
+  );
 }
 
 async function callDecisionModel(mode, prompt) {
@@ -332,12 +363,16 @@ async function generateDecision(userId, context, mode) {
       throw Object.assign(new Error(`AI service error: ${err.message}`), { status: 502 });
     }
     try {
-      const parsed = JSON.parse(text.trim());
+      const parsed = extractJson(text);
       const result = validateDecision(parsed, { hasPosition });
       if (result.ok) decision = result.decision;
       else lastErrors = result.errors;
     } catch {
       lastErrors = ['malformed JSON'];
+      logger.warn(
+        { symbol: context.symbol, attempt, snippet: (text || '').slice(0, 200) },
+        'AI decision response was not parseable JSON'
+      );
     }
   }
   if (!decision) {

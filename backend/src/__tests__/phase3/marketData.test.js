@@ -186,6 +186,28 @@ describe('getHistoricalData()', () => {
     expect(axios.get).not.toHaveBeenCalled();
   });
 
+  // Yahoo's `chartPreviousClose` is the close preceding the *requested range*,
+  // not the prior session. Intraday intervals request a wide range (1h => 3mo),
+  // so it is months stale; `previousClose` is the true prior session close.
+  test('uses the prior session close, not the range-boundary close', async () => {
+    const response = JSON.parse(JSON.stringify(MOCK_CHART_RESPONSE));
+    response.data.chart.result[0].meta = {
+      ...MOCK_META,
+      regularMarketPrice: 333.74,
+      previousClose: 333.26,      // true prior session close
+      chartPreviousClose: 270.23, // close from ~3mo ago (start of range)
+    };
+    axios.get.mockResolvedValueOnce(response);
+    const data = await getHistoricalData('AAPL', '1h', 200);
+    expect(data.previous_close).toBe(333.26);
+  });
+
+  test('falls back to chartPreviousClose when previousClose is absent', async () => {
+    axios.get.mockResolvedValueOnce(MOCK_CHART_RESPONSE);
+    const data = await getHistoricalData('AAPL', '1h', 200);
+    expect(data.previous_close).toBe(148.50);
+  });
+
   test('filters null-close candles', async () => {
     const responseWithNulls = {
       data: {

@@ -71,17 +71,39 @@ async function cancelOpenOrders(adapter, symbol) {
   return orders;
 }
 
+// A close submitted via closePosition() is a plain market order; protective
+// orders always carry a stop or limit price. An unfilled close from an earlier
+// cycle is therefore still working here, and must not be cancelled+resubmitted.
+function isWorkingCloseOrder(order) {
+  return order.order_type === 'market' && order.stop_price == null && order.limit_price == null;
+}
+
 async function closeFully({ adapter, userEmail, symbol }) {
+  let open;
+  try {
+    open = await adapter.getOpenOrders(symbol);
+  } catch (err) {
+    return { action: 'error', errorMessage: `failed to cancel open orders before close: ${err.message}` };
+  }
+
+  const working = open.find(isWorkingCloseOrder);
+  if (working) {
+    return { action: 'close_pending', detail: { broker_order_id: working.broker_order_id } };
+  }
+
   let cancelled;
   try {
-    cancelled = await cancelOpenOrders(adapter, symbol);
+    for (const o of open) await adapter.cancelOrder(o.broker_order_id);
+    cancelled = open;
   } catch (err) {
     return { action: 'error', errorMessage: `failed to cancel open orders before close: ${err.message}` };
   }
   try {
     const result = await adapter.closePosition(symbol);
-    notify(userEmail, symbol, 'position_closed', result.message);
-    return { action: 'position_closed', detail: { broker_order_id: result.order_id, cancelled_orders: cancelled.length } };
+    // The order is submitted, not necessarily filled. Only a fill means closed.
+    const action = result.status === 'filled' ? 'position_closed' : 'close_submitted';
+    notify(userEmail, symbol, action, result.message);
+    return { action, detail: { broker_order_id: result.order_id, cancelled_orders: cancelled.length } };
   } catch (err) {
     // Protective orders are gone but the position is still open — unprotected.
     await attention(userEmail, symbol, `Close failed after protective orders were cancelled: ${err.message}`);

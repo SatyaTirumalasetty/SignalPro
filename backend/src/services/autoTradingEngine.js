@@ -122,6 +122,25 @@ async function runForUser(userId, settings, userEmail) {
     return logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'error', errorMessage: `broker adapter: ${err.message}` });
   }
 
+  // A shut market cannot fill anything, so a cycle there is pure cost: one AI
+  // decision per symbol plus orders that queue instead of executing. Gate on
+  // the broker's own clock, and only where the broker has one — brokers
+  // without `market_clock` (24/7 venues) must keep running.
+  const caps = typeof adapter.capabilities === 'function' ? adapter.capabilities() : [];
+  if (caps.includes('market_clock')) {
+    let open;
+    try {
+      open = await adapter.isMarketOpen();
+    } catch (err) {
+      // Fail open: an unreachable clock must not silently halt trading.
+      logger.warn({ userId, err: err.message }, 'Market clock unavailable, proceeding with cycle');
+      open = true;
+    }
+    if (!open) {
+      return logRun({ userId, symbol: 'ALL', timeframe: '-', action: 'market_closed' });
+    }
+  }
+
   // Positions are ground truth from the broker. If we can't see them we can
   // neither open safely nor manage what exists — skip the whole cycle.
   let brokerPositions;

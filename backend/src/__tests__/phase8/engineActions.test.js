@@ -95,12 +95,36 @@ describe('close', () => {
       getOpenOrders: jest.fn().mockResolvedValue([
         { broker_order_id: 'stop-1', order_type: 'stop', stop_price: 145 },
       ]),
+      closePosition: jest.fn().mockResolvedValue({ order_id: 'b-1', status: 'filled', message: 'ok' }),
     });
     const res = await run({ adapter, position: LONG_POSITION, decision: decision({ action: 'close' }) });
     expect(adapter.cancelOrder).toHaveBeenCalledWith('stop-1');
     expect(adapter.closePosition).toHaveBeenCalledWith('AAPL');
     expect(res.action).toBe('position_closed');
     expect(mockActionEmail).toHaveBeenCalled();
+  });
+
+  // A close submitted via closePosition() is a market order with no stop/limit
+  // price. Off-hours it stays working, so a later cycle re-deciding `close`
+  // used to cancel its own pending exit and resubmit — one order per cycle.
+  test('does not cancel and resubmit while its own close order is still working', async () => {
+    const adapter = makeAdapter({
+      getOpenOrders: jest.fn().mockResolvedValue([
+        { broker_order_id: 'close-1', order_type: 'market', stop_price: null, limit_price: null },
+      ]),
+    });
+    const res = await run({ adapter, position: LONG_POSITION, decision: decision({ action: 'close' }) });
+    expect(res.action).toBe('close_pending');
+    expect(adapter.cancelOrder).not.toHaveBeenCalled();
+    expect(adapter.closePosition).not.toHaveBeenCalled();
+  });
+
+  test('reports close_submitted, not position_closed, until the order fills', async () => {
+    const adapter = makeAdapter({
+      closePosition: jest.fn().mockResolvedValue({ order_id: 'b-1', status: 'pending', message: 'ok' }),
+    });
+    const res = await run({ adapter, position: LONG_POSITION, decision: decision({ action: 'close' }) });
+    expect(res.action).toBe('close_submitted');
   });
 
   test('close failure AFTER cancels is needs_attention with email', async () => {

@@ -128,7 +128,16 @@ class AlpacaAdapter extends BaseAdapter {
   }
 
   capabilities() {
-    return ['place_order', 'cancel_order', 'close_position', 'replace_order', 'open_orders'];
+    return ['place_order', 'cancel_order', 'close_position', 'replace_order', 'open_orders', 'market_clock'];
+  }
+
+  async isMarketOpen() {
+    try {
+      const { data } = await this.http.get('/v2/clock');
+      return data.is_open === true;
+    } catch (err) {
+      throw this.apiError(`Alpaca: ${err.response?.data?.message || err.message}`, err.response?.status);
+    }
   }
 
   async getOpenOrders(symbol) {

@@ -128,6 +128,31 @@ describe('runForUser', () => {
     expect(mockDailyLossEmail).toHaveBeenCalled();
   });
 
+  // Running cycles against a shut market burns an AI decision per symbol on
+  // orders that cannot fill. Gate on the broker clock where the broker has one.
+  test('skips the whole cycle when the broker reports the market closed', async () => {
+    adapter.capabilities = () => ['market_clock'];
+    adapter.isMarketOpen = jest.fn().mockResolvedValue(false);
+    await runForUser(USER_ID, SETTINGS, EMAIL);
+    expect(mockGenerateDecision).not.toHaveBeenCalled();
+    expect(mockBuildMarketContext).not.toHaveBeenCalled();
+    expect(lastRunLog()[5]).toBe('market_closed');
+  });
+
+  test('runs normally when the broker reports the market open', async () => {
+    adapter.capabilities = () => ['market_clock'];
+    adapter.isMarketOpen = jest.fn().mockResolvedValue(true);
+    await runForUser(USER_ID, SETTINGS, EMAIL);
+    expect(mockGenerateDecision).toHaveBeenCalledTimes(1);
+  });
+
+  // Brokers without a clock (e.g. 24/7 crypto) must not be gated off.
+  test('proceeds when the broker exposes no market clock', async () => {
+    adapter.capabilities = () => ['place_order'];
+    await runForUser(USER_ID, SETTINGS, EMAIL);
+    expect(mockGenerateDecision).toHaveBeenCalledTimes(1);
+  });
+
   test('positions fetch failure fails closed: no decisions at all this cycle', async () => {
     adapter.getPositions.mockRejectedValue(new Error('broker down'));
     await runForUser(USER_ID, SETTINGS, EMAIL);

@@ -64,7 +64,10 @@ function parseYahooChart(data, bars) {
     exchange: meta.exchangeName,
     type: meta.instrumentType,
     current_price: meta.regularMarketPrice,
-    previous_close: meta.chartPreviousClose,
+    // `chartPreviousClose` is the close preceding the requested *range*, which
+    // for intraday intervals is months stale (1h => 3mo). `previousClose` is
+    // the true prior session close; fall back only when it is absent.
+    previous_close: meta.previousClose ?? meta.chartPreviousClose,
     candles: candles.slice(-bars),
   };
 }

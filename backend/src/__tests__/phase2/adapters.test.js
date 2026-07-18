@@ -96,6 +96,19 @@ describe('AlpacaAdapter', () => {
     await expect(adapter.validateCredentials()).rejects.toThrow();
   });
 
+  test('declares the market_clock capability', () => {
+    const adapter = new AlpacaAdapter(creds);
+    expect(adapter.capabilities()).toContain('market_clock');
+  });
+
+  test('isMarketOpen reflects the broker clock', async () => {
+    const adapter = new AlpacaAdapter(creds);
+    mockAxios.get.mockResolvedValueOnce({ data: { is_open: true, next_close: '2026-07-20T20:00:00Z' } });
+    await expect(adapter.isMarketOpen()).resolves.toBe(true);
+    mockAxios.get.mockResolvedValueOnce({ data: { is_open: false, next_open: '2026-07-20T13:30:00Z' } });
+    await expect(adapter.isMarketOpen()).resolves.toBe(false);
+  });
+
   test('getAccountInfo returns normalized account object', async () => {
     mockAxios.get.mockResolvedValueOnce({
       data: { id: 'acc-1', equity: '50000', cash: '10000', buying_power: '100000', status: 'ACTIVE', currency: 'USD' },
